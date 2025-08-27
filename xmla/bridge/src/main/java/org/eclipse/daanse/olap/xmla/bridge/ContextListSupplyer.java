@@ -17,16 +17,18 @@ import java.util.List;
 import java.util.Optional;
 
 import org.eclipse.daanse.olap.api.Context;
+import org.eclipse.daanse.olap.api.connection.Connection;
 import org.eclipse.daanse.olap.api.element.Catalog;
 
 public interface ContextListSupplyer {
 
     List<Context<?>> getContexts();
 
-    List<Catalog> get(List<String> roles);
+    List<Catalog> get(Optional<String> sessionId);
 
-    Optional<Catalog> tryGetFirstByName(String catalogName, List<String> roles);
+    Optional<Catalog> tryGetFirstByName(String catalogName, Optional<String> sessionId);
 
     Optional<Context<?>> getContext(String name);
-
+    
+    Connection getConnection(Optional<String> sessionId, String catalogName);
 }

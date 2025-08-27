@@ -57,7 +57,7 @@ public class ContextGroupXmlaService implements XmlaService {
         ContextListSupplyer contextsListSupplyer = new ContextsSupplyerImpl(contextGroup);
         executeService = new OlapExecuteService(contextsListSupplyer, actionService, lcidService, config);
         discoverService = new DelegatingDiscoverService(contextsListSupplyer, actionService, config);
-        sessionService = new SessionServiceImpl();
+        sessionService = new SessionServiceImpl(contextsListSupplyer);
     }
 
     private ExecuteService executeService;

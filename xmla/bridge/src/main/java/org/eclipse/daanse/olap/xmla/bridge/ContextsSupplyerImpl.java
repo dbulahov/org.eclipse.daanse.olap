@@ -13,7 +13,9 @@
 */
 package org.eclipse.daanse.olap.xmla.bridge;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.eclipse.daanse.olap.api.Context;
@@ -25,6 +27,7 @@ import org.eclipse.daanse.olap.api.element.Catalog;
 public class ContextsSupplyerImpl implements ContextListSupplyer {
 
     private final ContextGroup contextsGroup;
+    private Map<String, Map<String, Connection>> sessionCache = new HashMap<String, Map<String, Connection>>();
 
     // Accepts Null as Empty List
     public ContextsSupplyerImpl(ContextGroup contextsGroup) {
@@ -33,13 +36,13 @@ public class ContextsSupplyerImpl implements ContextListSupplyer {
     }
 
     @Override
-    public List<Catalog> get(List<String> roles) {
-        return getContexts().stream().map(context -> context.getConnection(new ConnectionProps(roles))).map(Connection::getCatalog).toList();
+    public List<Catalog> get(Optional<String> sessionId) {
+        return getContexts().stream().map(context -> getConnection(sessionId, context.getName())).map(Connection::getCatalog).toList();
     }
 
     @Override
-    public Optional<Catalog> tryGetFirstByName(String catalogName, List<String> roles) {
-        return getContext(catalogName).map(co -> co.getConnection(new ConnectionProps(roles)).getCatalog());
+    public Optional<Catalog> tryGetFirstByName(String catalogName, Optional<String> sessionId) {        
+        return Optional.of(getConnection(sessionId, catalogName).getCatalog());
     }
 
     @Override
@@ -51,6 +54,22 @@ public class ContextsSupplyerImpl implements ContextListSupplyer {
     public Optional<Context<?>> getContext(String name) {
         return getContexts().stream().filter(c -> c.getName().equals(name)).findFirst();
 
+    }
+
+    public Map<String, Map<String, Connection>> getSessionCache() {
+        return this.sessionCache;
+
+    }
+
+    @Override
+    public Connection getConnection(Optional<String> sessionId, String catalogName) {
+        if (sessionId.isPresent() && sessionCache.containsKey(sessionId.get())) {
+            Map<String, Connection> connectionMap =  sessionCache.get(sessionId.get());
+            if (connectionMap.containsKey(catalogName)) {
+                return connectionMap.get(catalogName);
+            }
+        }
+        throw new RuntimeException("Connection is absent in cache for session " + sessionId + " for catalog " + catalogName);
     }
 
 }

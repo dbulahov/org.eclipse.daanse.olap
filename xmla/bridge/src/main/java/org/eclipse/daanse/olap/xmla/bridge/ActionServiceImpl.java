@@ -82,12 +82,12 @@ public class ActionServiceImpl implements ActionService {
     public List<MdSchemaActionsResponseRow> getResponses(List<Catalog> catalogs, Optional<String> schemaName,
             String cubeName, Optional<String> actionName, Optional<ActionTypeEnum> actionType,
             Optional<String> coordinate, CoordinateTypeEnum coordinateType, InvocationEnum invocation,
-            Optional<CubeSourceEnum> cubeSource, RequestMetaData metaData, UserRolePrincipal userRolePrincipal) {
+            Optional<CubeSourceEnum> cubeSource, RequestMetaData metaData) {
         // TODO: one connection per context not each row
         List<MdSchemaActionsResponseRow> result = new ArrayList<>();
         result.addAll(catalogs.stream()
                 .map(c -> getMdSchemaActionsResponseRow(c, schemaName, cubeName, actionName, actionType, coordinate,
-                        coordinateType, invocation, cubeSource, metaData, userRolePrincipal))
+                        coordinateType, invocation, cubeSource, metaData))
                 .flatMap(Collection::stream).toList());
 
         if (CoordinateTypeEnum.CELL.equals(coordinateType)) {
@@ -165,8 +165,7 @@ public class ActionServiceImpl implements ActionService {
     private List<MdSchemaActionsResponseRow> getMdSchemaActionsResponseRow(Catalog catalog,
             Optional<String> oSchemaName, String cubeName, Optional<String> oActionName,
             Optional<ActionTypeEnum> oActionType, Optional<String> oCoordinate, CoordinateTypeEnum coordinateType,
-            InvocationEnum invocation, Optional<CubeSourceEnum> oCubeSource, RequestMetaData metaData,
-            UserRolePrincipal userPrincipal) {
+            InvocationEnum invocation, Optional<CubeSourceEnum> oCubeSource, RequestMetaData metaData) {
         if (catalog != null) {
             return getMdSchemaActionsResponseRow(catalog.getName(), catalog, cubeName, oActionName, oActionType,
                     oCoordinate, coordinateType, invocation, oCubeSource);

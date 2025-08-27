@@ -136,9 +136,9 @@ public class OtherDiscoverService {
     }
 
     public List<DiscoverDataSourcesResponseRow> dataSources(DiscoverDataSourcesRequest request,
-            RequestMetaData metaData, UserRolePrincipal userRolePrincipal) {
+            RequestMetaData metaData) {
         List<DiscoverDataSourcesResponseRow> result = new ArrayList<>();
-        List<Catalog> catalogs = this.contextsListSupplyer.get(RoleUtils.getRoles(contextsListSupplyer, r -> userRolePrincipal.hasRole(r)));
+        List<Catalog> catalogs = this.contextsListSupplyer.get(metaData.sessionId());
         for (Catalog catalog : catalogs) {
 
             result.add(new DiscoverDataSourcesResponseRowR("DataSource of " + catalog.getName(),
@@ -149,7 +149,7 @@ public class OtherDiscoverService {
     }
 
     public List<DiscoverEnumeratorsResponseRow> discoverEnumerators(DiscoverEnumeratorsRequest request,
-            RequestMetaData metaData, UserRolePrincipal userRolePrincipal) {
+            RequestMetaData metaData) {
         List<DiscoverEnumeratorsResponseRow> result = new ArrayList<>();
         for (Class c : enums) {
             String enumDescription = getEnumDescription(c.getSimpleName());
@@ -187,8 +187,7 @@ public class OtherDiscoverService {
         return result;
     }
 
-    public List<DiscoverKeywordsResponseRow> discoverKeywords(DiscoverKeywordsRequest request, RequestMetaData metaData,
-            UserRolePrincipal userRolePrincipal) {
+    public List<DiscoverKeywordsResponseRow> discoverKeywords(DiscoverKeywordsRequest request, RequestMetaData metaData) {
         List<DiscoverKeywordsResponseRow> result = new ArrayList<>();
         if (this.contextsListSupplyer.getContexts() != null && !this.contextsListSupplyer.getContexts().isEmpty()) {
             for (String keyword : this.contextsListSupplyer.getContexts().get(0).getKeywordList()) {
@@ -198,8 +197,7 @@ public class OtherDiscoverService {
         return result;
     }
 
-    public List<DiscoverLiteralsResponseRow> discoverLiterals(DiscoverLiteralsRequest request, RequestMetaData metaData,
-            UserRolePrincipal userRolePrincipal) {
+    public List<DiscoverLiteralsResponseRow> discoverLiterals(DiscoverLiteralsRequest request, RequestMetaData metaData) {
         List<DiscoverLiteralsResponseRow> result = new ArrayList<>();
         for (XmlaConstants.Literal anEnum : XmlaConstants.Literal.values()) {
             result.add(new DiscoverLiteralsResponseRowR(DBLITERAL + anEnum.name(), anEnum.getLiteralValue(),
@@ -211,7 +209,7 @@ public class OtherDiscoverService {
     }
 
     public List<DiscoverPropertiesResponseRow> discoverProperties(DiscoverPropertiesRequest request,
-            RequestMetaData metaData, UserRolePrincipal userRolePrincipal) {
+            RequestMetaData metaData) {
         List<String> propertyNames = request.restrictions() == null ? List.of() : request.restrictions().propertyName();
         Optional<String> properetyCatalog = request.properties().catalog();
         List<DiscoverPropertiesResponseRow> result = new ArrayList<>();
@@ -249,7 +247,7 @@ public class OtherDiscoverService {
     }
 
     public List<DiscoverSchemaRowsetsResponseRow> discoverSchemaRowsets(DiscoverSchemaRowsetsRequest request,
-            RequestMetaData metaData, UserRolePrincipal userRolePrincipal) {
+            RequestMetaData metaData) {
         Optional<String> schemaName = request.restrictions().schemaName();
         List<DiscoverSchemaRowsetsResponseRow> result = new ArrayList<>();
         for (Class<?> c : classes) {
@@ -286,7 +284,7 @@ public class OtherDiscoverService {
     }
 
     public List<DiscoverXmlMetaDataResponseRow> xmlMetaData(DiscoverXmlMetaDataRequest request,
-            RequestMetaData metaData, UserRolePrincipal userRolePrincipal) {
+            RequestMetaData metaData) {
         List<DiscoverXmlMetaDataResponseRow> result = new ArrayList<>();
         Optional<String> databaseId = request.restrictions().databaseId();
         String date = LocalDateTime.now().format(formatter);
@@ -294,8 +292,7 @@ public class OtherDiscoverService {
             databaseId = request.properties().catalog();
         }
         if (databaseId.isPresent()) {
-            Optional<Catalog> oCatalog = contextsListSupplyer.tryGetFirstByName(databaseId.get(),
-                    RoleUtils.getRoles(contextsListSupplyer, r -> userRolePrincipal.hasRole(r)));
+            Optional<Catalog> oCatalog = contextsListSupplyer.tryGetFirstByName(databaseId.get(), metaData.sessionId());
             if (oCatalog.isPresent()) {
                 Catalog catalog = oCatalog.get();
 
@@ -305,7 +302,7 @@ public class OtherDiscoverService {
                 }
             }
         } else {
-            List<Catalog> cs = contextsListSupplyer.get(List.of());
+            List<Catalog> cs = contextsListSupplyer.get(metaData.sessionId());
             if (cs != null) {
                 // for (Catalog catalog : cs) {
                 // result.add(new DiscoverXmlMetaDataResponseRowR(String.format(md, catalog.getName(),

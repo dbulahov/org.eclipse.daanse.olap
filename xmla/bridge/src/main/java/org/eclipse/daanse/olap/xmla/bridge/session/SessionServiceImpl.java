@@ -13,11 +13,20 @@
 */
 package org.eclipse.daanse.olap.xmla.bridge.session;
 
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 
+import org.eclipse.daanse.olap.api.Context;
+import org.eclipse.daanse.olap.api.connection.Connection;
+import org.eclipse.daanse.olap.api.connection.ConnectionProps;
+import org.eclipse.daanse.olap.xmla.bridge.ContextListSupplyer;
+import org.eclipse.daanse.olap.xmla.bridge.ContextsSupplyerImpl;
 import org.eclipse.daanse.xmla.api.UserRolePrincipal;
 import org.eclipse.daanse.xmla.api.session.SessionService;
 import org.eclipse.daanse.xmla.api.xmla.BeginSession;
@@ -31,10 +40,23 @@ public class SessionServiceImpl implements SessionService {
     // not in bridge daanse.server
     private Set<String> store = new HashSet<>();
 
+    private ContextListSupplyer contextsListSupplyer;
+
+    public SessionServiceImpl(ContextListSupplyer contextsListSupplyer) {        
+        this.contextsListSupplyer = contextsListSupplyer;
+    }
+    
     @Override
-    public Optional<Session> beginSession(BeginSession beginSession, UserRolePrincipal userPrincipal) {
+    public Optional<Session> beginSession(BeginSession beginSession, UserRolePrincipal userRolePrincipal) {
 
         String sessionStr = UUID.randomUUID().toString();
+        Function<String, Boolean> isUserInRoleFunction = r -> userRolePrincipal.hasRole(r);
+        for (Context<?> context : contextsListSupplyer.getContexts()) {
+            List<String> roles = context.getAccessRoles().stream().filter(r -> isUserInRoleFunction.apply(r)).toList();
+            Connection con = context.getConnection(new ConnectionProps(roles));
+            ((ContextsSupplyerImpl) contextsListSupplyer).getSessionCache()
+            .computeIfAbsent(sessionStr, k -> new HashMap<String, Connection>()).put(context.getName(), con);
+        }
         store.add(sessionStr);
         return Optional.of(new SessionR(sessionStr, null));
     }
@@ -46,6 +68,7 @@ public class SessionServiceImpl implements SessionService {
 
     @Override
     public void endSession(EndSession endSession, UserRolePrincipal userPrincipal) {
+        ((ContextsSupplyerImpl) contextsListSupplyer).getSessionCache().remove(endSession.sessionId());
         store.remove(endSession.sessionId());
     }
 

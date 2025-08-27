@@ -277,14 +277,13 @@ public class Utils {
 
     static List<MdSchemaCubesResponseRow> getMdSchemaCubesResponseRow(Catalog catalog, Optional<String> schemaName,
             Optional<String> cubeName, Optional<String> baseCubeName, Optional<CubeSourceEnum> cubeSource,
-            RequestMetaData metaData, UserRolePrincipal userRolePrincipal) {
+            RequestMetaData metaData) {
 
         return getMdSchemaCubesResponseRow(catalog, cubeName, baseCubeName, cubeSource);
     }
 
     static List<MdSchemaFunctionsResponseRow> getMdSchemaFunctionsResponseRow(Context c, Optional<String> oLibraryName,
-            Optional<InterfaceNameEnum> oInterfaceName, Optional<OriginEnum> oOrigin, RequestMetaData metaData,
-            UserRolePrincipal userRolePrincipal) {
+            Optional<InterfaceNameEnum> oInterfaceName, Optional<OriginEnum> oOrigin, RequestMetaData metaData) {
         List<MdSchemaFunctionsResponseRow> result = new ArrayList<>();
         List<FunctionMetaData> fmList = c.getFunctionService().getFunctionMetaDatas();
         StringBuilder buf = new StringBuilder(50);
@@ -514,7 +513,7 @@ public class Utils {
     static List<MdSchemaLevelsResponseRow> getMdSchemaLevelsResponseRow(Catalog catalog, Optional<String> oSchemaName,
             Optional<String> oCubeName, Optional<String> oDimensionUniqueName, Optional<String> oHierarchyUniqueName,
             Optional<String> oLevelName, Optional<String> oLevelUniqueName, Optional<VisibilityEnum> oLevelVisibility,
-            RequestMetaData metaData, UserRolePrincipal userRolePrincipal) {
+            RequestMetaData metaData) {
         return getMdSchemaLevelsResponseRow(catalog.getName(), catalog, oCubeName, oDimensionUniqueName,
                 oHierarchyUniqueName, oLevelName, oLevelUniqueName, oLevelVisibility);
     }
@@ -522,8 +521,7 @@ public class Utils {
     static List<MdSchemaDimensionsResponseRow> getMdSchemaDimensionsResponseRow(Catalog catalog,
             Optional<String> oSchemaName, Optional<String> oCubeName, Optional<String> oDimensionName,
             Optional<String> oDimensionUniqueName, Optional<CubeSourceEnum> cubeSource,
-            Optional<VisibilityEnum> oDimensionVisibility, Optional<Boolean> deep, RequestMetaData metaData,
-            UserRolePrincipal userRolePrincipal) {
+            Optional<VisibilityEnum> oDimensionVisibility, Optional<Boolean> deep, RequestMetaData metaData) {
         return getMdSchemaDimensionsResponseRow(catalog.getName(), catalog, oCubeName, oDimensionName,
                 oDimensionUniqueName, cubeSource, oDimensionVisibility, deep);
 
@@ -532,7 +530,7 @@ public class Utils {
     static List<MdSchemaMeasureGroupDimensionsResponseRow> getMdSchemaMeasureGroupDimensionsResponseRow(Catalog catalog,
             Optional<String> oSchemaName, Optional<String> oCubeName, Optional<String> oMeasureGroupName,
             Optional<String> oDimensionUniqueName, Optional<VisibilityEnum> oDimensionVisibility,
-            RequestMetaData metaData, UserRolePrincipal userRolePrincipal) {
+            RequestMetaData metaData) {
         return getMdSchemaMeasureGroupDimensionsResponseRow(catalog, oCubeName, oMeasureGroupName, oDimensionUniqueName,
                 oDimensionVisibility);
     }
@@ -558,8 +556,7 @@ public class Utils {
 
     static List<MdSchemaSetsResponseRow> getMdSchemaSetsResponseRow(Catalog catalog, Optional<String> oSchemaName,
             Optional<String> oCubeName, Optional<String> oSetName, Optional<ScopeEnum> oScope,
-            Optional<CubeSourceEnum> oCubeSource, Optional<String> oHierarchyUniqueName, RequestMetaData metaData,
-            UserRolePrincipal userRolePrincipal) {
+            Optional<CubeSourceEnum> oCubeSource, Optional<String> oHierarchyUniqueName, RequestMetaData metaData) {
 
         return getMdSchemaSetsResponseRow(catalog, null, oCubeName, oSetName, oScope, oCubeSource,
                 oHierarchyUniqueName);
@@ -1239,8 +1236,7 @@ public class Utils {
             Optional<String> oSchemaName, Optional<String> oCubeName, Optional<CubeSourceEnum> oCubeSource,
             Optional<String> oDimensionUniqueName, Optional<String> oHierarchyName,
             Optional<String> oHierarchyUniqueName, Optional<VisibilityEnum> oHierarchyVisibility,
-            Optional<Integer> oHierarchyOrigin, Optional<Boolean> deep, RequestMetaData requestMetaData,
-            UserRolePrincipal userRolePrincipal) {
+            Optional<Integer> oHierarchyOrigin, Optional<Boolean> deep, RequestMetaData requestMetaData) {
         return getMdSchemaHierarchiesResponseRow(catalog.getName(), catalog, oCubeName, oCubeSource,
                 oDimensionUniqueName, oHierarchyName, oHierarchyUniqueName, oHierarchyVisibility, oHierarchyOrigin,
                 deep);
