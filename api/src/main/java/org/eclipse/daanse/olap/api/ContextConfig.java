@@ -159,6 +159,18 @@ public interface ContextConfig {
      */
     int levelPreCacheThreshold();
 
+    /**
+     * Weight cap for each cached native set result store (per catalog): the sum
+     * over all cached tuple lists of tuples times arity may not exceed this;
+     * least-recently-used results are evicted beyond it.
+     *
+     * <p>
+     * Default 1000000. The cache is bounded and strongly referenced - it
+     * shrinks by this cap, not with memory pressure.
+     * </p>
+     */
+    int nativeTupleCacheMaxTuples();
+
     // ------------------------------------------------------------------
     // Cell cache and segments
     //
@@ -168,27 +180,14 @@ public interface ContextConfig {
     // ------------------------------------------------------------------
 
     /**
-     * Class name of an external segment cache, instantiated by name through the
-     * thread context class loader using its no-argument constructor.
-     *
-     * <p>
-     * Empty for none, which is the default. An external cache lets several server
-     * instances share loaded segments. Implementations found through the service
-     * loader are used in addition to this one, so a cache can be active with this
-     * unset.
-     * </p>
-     */
-    String segmentCache();
-
-    /**
      * Whether cell caching is bypassed.
      *
      * <p>
      * Default false. Nothing is cleared - segments are simply not indexed, not
      * stored and not rolled up, and the member cache and the cached native tuple
-     * results are switched off as well. Reads from a configured external segment
-     * cache still happen. Useful for measuring a query from cold, almost never in
-     * production.
+     * results are switched off as well. External segment caches are never
+     * attached while this is set. Useful for measuring a query from cold,
+     * almost never in production.
      * </p>
      */
     boolean disableCaching();
@@ -206,14 +205,17 @@ public interface ContextConfig {
     boolean disableLocalSegmentCache();
 
     /**
-     * Whether each connection gets its own segment cache manager instead of
-     * sharing the context's.
+     * Whether every connection gets its own segment cache OVERLAY instead of
+     * sharing the context's caches.
      *
      * <p>
-     * Default false. It isolates one user's cached cells from another's at the
-     * cost of loading the same data repeatedly, and every manager brings its own
-     * threads. The per-connection managers are not released when the connection
-     * closes.
+     * Default false. It isolates one user's cached cells from another's at
+     * the cost of loading the same data repeatedly. An overlay shares the
+     * context's actor and executors and holds only a private in-memory
+     * store; it is released when the connection closes. Independent of
+     * this flag, a session with PENDING WRITEBACK changes always gets an
+     * overlay - uncommitted session values must never reach the shared
+     * (or external) caches.
      * </p>
      */
     boolean enableSessionCaching();
@@ -771,6 +773,20 @@ public interface ContextConfig {
      * </p>
      */
     boolean enableRolapCubeMemberCache();
+
+    /**
+     * Weight cap for each hierarchy's member-list caches (children lists and
+     * level-member lists; the weight of an entry is its member count, and the
+     * named-children store counts entries against the same cap). Least-recently-
+     * used lists are evicted beyond it.
+     *
+     * <p>
+     * Default 200000 per cache per hierarchy. The member-key cache that
+     * guarantees one object per member is not governed by this - it stays
+     * softly referenced.
+     * </p>
+     */
+    int memberListCacheMaxWeight();
 
     /**
      * Whether snowflake dimensions are joined so that members without children are

@@ -185,10 +185,6 @@ public class MapContextConfig implements ContextConfig {
 
     // --- cell cache and segments --------------------------------------
 
-    @Override
-    public String segmentCache() {
-        return value(ConfigConstants.SEGMENT_CACHE, ConfigConstants.SEGMENT_CACHE_DEFAULT_VALUE, String.class);
-    }
 
     @Override
     public boolean disableCaching() {
@@ -492,5 +488,17 @@ public class MapContextConfig implements ContextConfig {
     @Override
     public int resultLimit() {
         return value(ConfigConstants.RESULT_LIMIT, ConfigConstants.RESULT_LIMIT_DEFAULT_VALUE, Integer.class);
+    }
+
+    @Override
+    public int memberListCacheMaxWeight() {
+        return value(ConfigConstants.MEMBER_LIST_CACHE_MAX_WEIGHT,
+                ConfigConstants.MEMBER_LIST_CACHE_MAX_WEIGHT_DEFAULT_VALUE, Integer.class);
+    }
+
+    @Override
+    public int nativeTupleCacheMaxTuples() {
+        return value(ConfigConstants.NATIVE_TUPLE_CACHE_MAX_TUPLES,
+                ConfigConstants.NATIVE_TUPLE_CACHE_MAX_TUPLES_DEFAULT_VALUE, Integer.class);
     }
 }

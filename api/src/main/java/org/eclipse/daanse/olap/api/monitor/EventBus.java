@@ -23,8 +23,6 @@ public interface EventBus extends java.util.function.Consumer<Event> {
      * @param event the event
      */
     @Override
-    default void accept(Event event) {
-
-    }
+    void accept(Event event);
 
 }

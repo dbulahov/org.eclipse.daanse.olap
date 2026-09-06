@@ -12,6 +12,8 @@
 */
 package org.eclipse.daanse.olap.api.monitor.event;
 
-public non-sealed interface UserSpaceEvent extends Event {
+public // deliberate extension door: user code can publish its own events onto the
+// bus (no engine implementations exist by design)
+non-sealed interface UserSpaceEvent extends Event {
 
 }

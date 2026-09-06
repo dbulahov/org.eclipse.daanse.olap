@@ -30,6 +30,6 @@ public interface OlapSegmentCacheManager {
 
     <T> T execute(CacheCommand<T> command);
 
-    OlapSegmentCacheIndex getIndexRegistry();
+    OlapSegmentCacheIndexRegistry getIndexRegistry();
 
 }

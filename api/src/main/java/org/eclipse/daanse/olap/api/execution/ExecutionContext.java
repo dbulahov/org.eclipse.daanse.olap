@@ -13,7 +13,6 @@
  */
 package org.eclipse.daanse.olap.api.execution;
 
-import java.sql.Statement;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -21,7 +20,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.eclipse.daanse.olap.api.Context;
@@ -40,11 +38,11 @@ import org.eclipse.daanse.olap.api.connection.Connection;
  * <p>
  * ExecutionContext tracks the state of a query execution including:
  * <ul>
- * <li>Unique execution ID</li>
- * <li>Start time and timeout</li>
- * <li>Execution state (RUNNING, CANCELED, TIMEOUT, ERROR, DONE)</li>
+ * <li>Absolute deadline (null = unlimited), resolved once at the root</li>
+ * <li>Execution state (RUNNING, CANCELED, TIMEOUT), read and marked on the
+ * root of the tree</li>
  * <li>Parent execution for nested queries</li>
- * <li>SQL statements registered for cancellation</li>
+ * <li>SQL statements registered for cancellation (held on the root context of the tree)</li>
  * <li>Metadata for tracing and monitoring</li>
  * </ul>
  *
@@ -52,20 +50,22 @@ import org.eclipse.daanse.olap.api.connection.Connection;
  * Usage example:
  *
  * <pre>
- * // Create root context with metadata
+ * // Create root context with metadata; an empty timeout means UNLIMITED
  * ExecutionMetadata rootMetadata = ExecutionMetadata.of("QueryExecution", "MDX Query", null, 0);
- * ExecutionContext ctx = ExecutionContext.root(Duration.ofMinutes(5), rootMetadata);
+ * ExecutionContext ctx = ExecutionContext.root(Optional.of(Duration.ofMinutes(5)), rootMetadata);
  *
  * ExecutionContext.where(ctx, () -> {
  *     // Your code here has access to ctx via ExecutionContext.current()
  *     ExecutionContext current = ExecutionContext.current();
  *     current.checkCancelOrTimeout();
  *
- *     // Create child context inheriting parent timeout
+ *     // Create child context inheriting the parent's ABSOLUTE deadline
+ *     // (the clock does not restart per child)
  *     ExecutionMetadata childMetadata = ExecutionMetadata.of("Component", "message", null, 0);
  *     ExecutionContext child1 = current.createChild(childMetadata, Optional.empty());
  *
- *     // Create child context with custom timeout (shorter than parent)
+ *     // An explicit child timeout only TIGHTENS the budget - a longer one
+ *     // is silently clamped to the parent's deadline
  *     ExecutionMetadata fastMetadata = ExecutionMetadata.of("FastOp", "quick operation", null, 0);
  *     ExecutionContext child2 = current.createChild(fastMetadata, Optional.of(Duration.ofSeconds(30)));
  *
@@ -77,19 +77,26 @@ import org.eclipse.daanse.olap.api.connection.Connection;
  */
 public final class ExecutionContext {
     private static final ScopedValue<ExecutionContext> CURRENT = ScopedValue.newInstance();
-    private static final AtomicLong ID_GENERATOR = new AtomicLong(0);
 
     // Core state
-    private final long id;
-    private final Instant startTime;
-    private final Duration timeout;
+    // Absolute deadline of this context; null = unlimited. Resolved ONCE:
+    // children inherit the parent's deadline verbatim (the budget is per
+    // query tree - a child restarting the clock stretched it arbitrarily);
+    // an explicit child timeout may only tighten it.
+    private final Instant deadline;
+    // whether the deadline is the tree-wide (root/inherited) budget - a
+    // child-tightened budget fails only the child on elapse
+    private final boolean treeDeadline;
     private final AtomicReference<State> state;
 
     // Hierarchy
     private final ExecutionContext parent;
 
-    // SQL Statements for cancellation
-    private final List<Statement> sqlStatements;
+    // SQL statements for cancellation. Registration and cancellation both
+    // resolve to the ABSOLUTE ROOT context's list: almost all SQL runs on
+    // child contexts (member loads, tuple reads, statistics, drillthrough),
+    // and a cancel that only walked its own list reached none of them.
+    private final List<GuardedStatement> sqlStatements;
 
     // Execution reference (for compatibility with legacy code during migration)
     private Execution execution;
@@ -102,23 +109,40 @@ public final class ExecutionContext {
      *
      * @param parent   the parent context (null for root contexts)
      * @param metadata the metadata (defaults to empty if null)
-     * @param timeout  the timeout duration (inherits from parent if empty and
-     *                 parent exists)
+     * @param timeout  empty inherits the parent's absolute deadline (root:
+     *                 unlimited); a present value resolves to
+     *                 min(now + timeout, parent deadline)
      */
     private ExecutionContext(ExecutionContext parent, ExecutionMetadata metadata, Optional<Duration> timeout) {
-        this.id = ID_GENERATOR.incrementAndGet();
         this.parent = parent;
-        this.startTime = Instant.now();
         this.state = new AtomicReference<>(State.RUNNING);
-        this.sqlStatements = Collections.synchronizedList(new ArrayList<>());
+        // only the ROOT context ever holds statements (registration walks to
+        // it); children get an immutable empty list so nothing can bypass
+        // the root registry by touching a child's list directly
+        this.sqlStatements = parent == null
+                ? Collections.synchronizedList(new ArrayList<>())
+                : List.of();
 
-        // Timeout: explicit > parent > default
+        // Deadline: an EMPTY timeout means unlimited (executeDuration <= 0
+        // maps to empty - it must never silently become a default budget);
+        // children inherit the parent's absolute deadline; an explicit
+        // child timeout only tightens, never extends past the parent.
+        // treeDeadline records WHOSE budget this is: the root's/inherited
+        // one times the whole tree out, a child's own tightened budget
+        // fails only the child (see checkCancelOrTimeout).
+        Instant inherited = parent == null ? null : parent.deadline;
         if (timeout.isPresent()) {
-            this.timeout = timeout.get();
-        } else if (parent != null) {
-            this.timeout = parent.timeout;
+            Instant own = Instant.now().plus(timeout.get());
+            if (inherited != null && inherited.isBefore(own)) {
+                this.deadline = inherited;
+                this.treeDeadline = true;
+            } else {
+                this.deadline = own;
+                this.treeDeadline = parent == null;
+            }
         } else {
-            this.timeout = Duration.ofMinutes(5);
+            this.deadline = inherited;
+            this.treeDeadline = true;
         }
 
         // Metadata: explicit > empty
@@ -128,7 +152,9 @@ public final class ExecutionContext {
     /**
      * Creates a root execution context with the specified timeout and metadata.
      *
-     * @param timeout  the timeout duration
+     * @param timeout  the timeout duration; EMPTY means unlimited
+     *                 (executeDuration <= 0 maps to empty and must never
+     *                 become a default budget)
      * @param metadata the metadata for the root context
      * @return a new root ExecutionContext
      */
@@ -161,14 +187,6 @@ public final class ExecutionContext {
         return CURRENT.isBound() ? CURRENT.get() : null;
     }
 
-    /**
-     * Returns true if an ExecutionContext is currently bound to this scope.
-     *
-     * @return true if a context is bound, false otherwise
-     */
-    public static boolean isBound() {
-        return CURRENT.isBound();
-    }
 
     /**
      * Executes the given task within the scope of this execution context. The
@@ -217,11 +235,21 @@ public final class ExecutionContext {
      * Checks if this execution has been canceled or timed out. Throws an exception
      * if the execution has been canceled or exceeded its timeout.
      *
+     * <p>State is read and marked on the ROOT, so a timeout noticed on one
+     * child is visible to every sibling and to later statement
+     * registrations; the first observer of an elapsed deadline CAS-marks
+     * TIMEOUT and cancels the tree's registered statements.</p>
+     *
      * @throws QueryCanceledException if the execution was canceled
      * @throws QueryTimeoutException  if the execution has timed out
      */
     public void checkCancelOrTimeout() {
-        State currentState = state.get();
+        // state lives on the ROOT: a timeout noticed on one child must be
+        // visible to every sibling (and to registerStatement) - previously
+        // each child had its own state and a query kept issuing SQL after
+        // it "timed out"
+        final ExecutionContext root = rootContext();
+        State currentState = root.state.get();
 
         if (currentState == State.CANCELED) {
             throw new QueryCanceledException("Query canceled");
@@ -231,92 +259,108 @@ public final class ExecutionContext {
             throw new QueryTimeoutException("Query timeout");
         }
 
-        // Check timeout
-        if (Duration.between(startTime, Instant.now()).compareTo(timeout) > 0) {
-            if (state.compareAndSet(State.RUNNING, State.TIMEOUT)) {
-                cancel(); // Cancel all statements
+        // Check timeout; null deadline = unlimited
+        if (deadline != null && Instant.now().isAfter(deadline)) {
+            // only the ROOT'S budget (or the inherited copy of it) times
+            // the whole tree out. A child's own TIGHTENED budget fails
+            // just that child: a 30s statistics probe inside a 5-minute
+            // query must not CAS the root to TIMEOUT and cancel every
+            // sibling's SQL with most of the real budget left.
+            if (treeDeadline
+                    && root.state.compareAndSet(State.RUNNING, State.TIMEOUT)) {
+                cancelRegisteredStatements();
             }
             throw new QueryTimeoutException("Query timeout");
         }
     }
 
     /**
-     * Cancels this execution and all registered SQL statements. This method is
-     * idempotent - calling it multiple times has the same effect as calling it
-     * once.
+     * Cancels this execution and all SQL statements registered anywhere in
+     * this context tree. Statements live on the root context's list (see
+     * {@link #registerStatement}), so canceling a child - the timeout path
+     * calls {@code this.cancel()} on whichever context noticed - reaches
+     * them all. Idempotent; a closed statement's guard is inert.
      */
     public void cancel() {
-        state.set(State.CANCELED);
+        // CAS: a TIMEOUT already recorded stays a TIMEOUT - cancel() runs
+        // as the timeout's own side effect, and overwriting the state made
+        // the same event report as a timeout to the first poller and as a
+        // cancel to every later one
+        rootContext().state.compareAndSet(State.RUNNING, State.CANCELED);
+        cancelRegisteredStatements();
+    }
 
-        // Cancel all SQL statements
-        synchronized (sqlStatements) {
-            for (Statement stmt : sqlStatements) {
-                try {
-                    stmt.cancel();
-                } catch (Exception e) {
-                    // Log but continue canceling others
-                    // Intentionally swallow exception to ensure all statements are canceled
-                }
-            }
+    /**
+     * Cancels every registered statement of the tree. Snapshot, then
+     * cancel outside the list lock: a cancel is a JDBC network round-trip
+     * per statement, and register/unregister must not queue behind it.
+     * Guards are idempotent, so racing an unregister is harmless.
+     */
+    private void cancelRegisteredStatements() {
+        final List<GuardedStatement> list = rootContext().sqlStatements;
+        final List<GuardedStatement> snapshot;
+        synchronized (list) {
+            snapshot = new ArrayList<>(list);
+        }
+        for (GuardedStatement stmt : snapshot) {
+            stmt.cancel();
         }
     }
 
     /**
-     * Registers a SQL statement for automatic cancellation when this execution is
-     * canceled.
+     * Registers a SQL statement for automatic cancellation when this
+     * execution tree is canceled. The statement is stored on the ABSOLUTE
+     * ROOT context: cancellation granularity is the whole execution tree
+     * (matching {@code Execution.cancelSqlStatements()}, which already
+     * cascades to parent executions). If the tree is already canceled or
+     * timed out, the statement is canceled immediately - registration
+     * after cancel must not create an unkillable statement.
      *
-     * @param stmt the SQL statement to register
+     * @param stmt the guarded SQL statement to register
      * @throws NullPointerException if stmt is null
      */
-    public void registerStatement(Statement stmt) {
+    public void registerStatement(GuardedStatement stmt) {
         Objects.requireNonNull(stmt, "statement");
-        sqlStatements.add(stmt);
+        final ExecutionContext root = rootContext();
+        root.sqlStatements.add(stmt);
+        if (treeCancelOrTimeout(root)) {
+            stmt.cancel();
+        }
     }
 
     /**
-     * Returns the unique ID of this execution.
-     *
-     * @return the execution ID
+     * Removes a statement registered with {@link #registerStatement} - the
+     * statement's owner calls this on close, so the root list does not grow
+     * for the lifetime of a long execution. Safe to call for a statement
+     * that was never registered.
      */
-    public long id() {
-        return id;
+    public void unregisterStatement(GuardedStatement stmt) {
+        Objects.requireNonNull(stmt, "statement");
+        rootContext().sqlStatements.remove(stmt);
     }
 
-    /**
-     * Returns the start time of this execution.
-     *
-     * @return the start time
-     */
-    public Instant startTime() {
-        return startTime;
+    private ExecutionContext rootContext() {
+        ExecutionContext c = this;
+        while (c.parent != null) {
+            c = c.parent;
+        }
+        return c;
     }
 
-    /**
-     * Returns the timeout duration for this execution.
-     *
-     * @return the timeout duration
-     */
-    public Duration timeout() {
-        return timeout;
-    }
-
-    /**
-     * Returns the current state of this execution.
-     *
-     * @return the current state
-     */
-    public State state() {
-        return state.get();
-    }
-
-    /**
-     * Returns the parent execution context, or null if this is a top-level
-     * execution.
-     *
-     * @return the parent execution context, or null
-     */
-    public ExecutionContext parent() {
-        return parent;
+    /** Non-throwing: is this tree canceled or timed out already? */
+    private boolean treeCancelOrTimeout(ExecutionContext root) {
+        State rootState = root.state.get();
+        if (rootState == State.CANCELED || rootState == State.TIMEOUT) {
+            return true;
+        }
+        // an elapsed deadline nobody polled yet still gates registration
+        if (deadline != null && Instant.now().isAfter(deadline)) {
+            return true;
+        }
+        // the Execution may have flipped its state before propagating it
+        // into the context (ExecutionImpl.cancel sets state first)
+        Execution ex = getExecution();
+        return ex != null && ex.isCancelOrTimeout();
     }
 
     /**
@@ -382,8 +426,9 @@ public final class ExecutionContext {
      * Creates a child execution context with new metadata and custom timeout.
      *
      * @param metadata the metadata for the child context
-     * @param timeout  the timeout for the child context (empty to inherit from
-     *                 parent)
+     * @param timeout  the timeout for the child context (empty inherits the
+     *                 parent's absolute deadline; a present value only
+     *                 tightens, never extends past the parent)
      * @return a new child ExecutionContext with the specified metadata and timeout
      */
     public ExecutionContext createChild(ExecutionMetadata metadata, Optional<Duration> timeout) {

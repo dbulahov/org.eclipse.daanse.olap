@@ -35,19 +35,9 @@ public sealed interface CellCacheEvent extends ExecutionEvent
      */
     public enum Source {
         /**
-         * A segment that is placed into the cache by an external cache.
-         *
-         *
-         * Some caches (e.g. memcached) never generate this kind of event.
-         *
-         *
-         *
-         * In JBoss Infinispan, one scenario that causes this kind of event is as
-         * follows. A user issues an MDX query against a different Mondrian node in the
-         * same Infinispan cluster. To resolve missing cells, that node issues a SQL
-         * statement to load a segment. Infinispan propagates that segment to its peers,
-         * and each peer is notified that an "external segment" is now in the cache.
-         *
+         * A segment that arrived from an external segment cache: another
+         * instance published it, or an attached store announced it
+         * (external-created events, star priming on attach).
          */
         EXTERNAL,
 

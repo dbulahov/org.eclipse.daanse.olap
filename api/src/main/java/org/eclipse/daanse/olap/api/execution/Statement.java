@@ -30,16 +30,6 @@ public interface Statement {
 
     Connection getConnection();
 
-    /**
-     * Executes an mdx SelectStatement.
-     *
-     * @param mdx MDX
-     *
-     * @return Result
-     *
-     */
-    Result executeSelect(String mdx) throws Exception;
-
     CellSet executeQuery(String statement);
 
     CellSet executeQuery(Query query);
@@ -91,18 +81,6 @@ public interface Statement {
     void enableProfiling(ProfileHandler profileHandler);
 
     ProfileHandler getProfileHandler();
-
-    /**
-     * Sets the timeout of this statement, in milliseconds.
-     *
-     * Zero means no timeout.
-     *
-     * Contrast with JDBC's java.sql.Statement#setQueryTimeout(int) method, which
-     * uses an {@code int} value and a granularity of seconds.
-     *
-     * @param timeoutMillis Timeout in milliseconds
-     */
-    void setQueryTimeoutMillis(long timeoutMillis);
 
     /**
      * Returns the query timeout of this statement, in milliseconds.

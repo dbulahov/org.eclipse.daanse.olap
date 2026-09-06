@@ -103,6 +103,20 @@ public interface Scenario {
     /** Every cube something is pending for. */
     Set<Cube> pendingCubes();
 
+    /**
+     * Forgets the pending rows of ONE cube - called after that cube's rows
+     * were made permanent, so a retry of a partially failed multi-cube
+     * commit does not write them a second time.
+     */
+    void clearPendingRows(Cube cube);
+
+    /**
+     * Whether anything is pending, of either kind. While this is {@code true}
+     * the session reads cells through a private cache overlay instead of the
+     * shared segment caches.
+     */
+    boolean hasPendingChanges();
+
     /** Forgets everything pending, of both kinds. */
     void clear();
 }

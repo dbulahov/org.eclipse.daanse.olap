@@ -50,6 +50,7 @@ import org.eclipse.daanse.olap.api.result.Scenario;
 import org.eclipse.daanse.olap.xmla.connector.session.SessionScenarios;
 import org.eclipse.daanse.xmla.api.XmlaCommandFailedException;
 import org.eclipse.daanse.olap.common.StandardProperty;
+import org.eclipse.daanse.olap.core.AbstractBasicContext;
 import org.eclipse.daanse.olap.query.component.QueryPrintWriter;
 import org.eclipse.daanse.olap.xmla.connector.ContextListSupplyer;
 import org.eclipse.daanse.xmla.model.io.RowsetCatalog;
@@ -147,10 +148,14 @@ public class OlapExecute {
         for (Context<?> olapContext : contexts.getContexts()) {
             try {
                 Connection connection = olapContext.getConnection(new ConnectionProps(rolesOf(context, olapContext)));
-                @SuppressWarnings("unchecked")
-                Context<Connection> typed = (Context<Connection>) connection.getContext();
-                for (org.eclipse.daanse.olap.api.execution.Statement statement : typed.getStatements(connection)) {
-                    statement.cancel();
+                try {
+                    @SuppressWarnings("unchecked")
+                    Context<Connection> typed = (Context<Connection>) connection.getContext();
+                    for (org.eclipse.daanse.olap.api.execution.Statement statement : typed.getStatements(connection)) {
+                        statement.cancel();
+                    }
+                } finally {
+                    connection.close();
                 }
             } catch (java.sql.SQLException e) {
                 throw new RuntimeException("Cancel failed against " + olapContext.getName(), e);
@@ -198,39 +203,50 @@ public class OlapExecute {
 
         Connection connection = olapContext.get()
                 .getConnection(new ConnectionProps(rolesOf(context, olapContext.get()), locale(properties)));
-        QueryComponent queryComponent = connection.parseStatement(mdx);
+        // close in EVERY arm, not just drill-through: the context registry
+        // holds every connection strongly, so a leaked one pinned its
+        // session cache overlay (and the overlay's local store of
+        // uncommitted writeback segments) for the process lifetime.
+        // close() is idempotent and reaps the overlay itself
+        // (removeSegmentCacheManager) - so the transaction-boundary reap
+        // no longer depends on matching the connection object either.
+        try {
+            QueryComponent queryComponent = connection.parseStatement(mdx);
 
-        String sessionId = context.sessionId();
-        if (queryComponent instanceof DmvQuery dmvQuery) {
-            return dmv(dmvQuery, request, context);
+            String sessionId = context.sessionId();
+            if (queryComponent instanceof DmvQuery dmvQuery) {
+                return dmv(dmvQuery, request, context);
+            }
+            if (named.isEmpty()) {
+                LOGGER.warn("no catalog named and more than one available; nothing is run");
+                return null;
+            }
+            if (queryComponent instanceof Query query) {
+                return runQuery(query, properties, sessionId);
+            }
+            if (queryComponent instanceof DrillThrough drillThrough) {
+                return drillThrough(drillThrough, properties, sessionId);
+            }
+            if (queryComponent instanceof SqlQuery sqlQuery) {
+                return sql(sqlQuery, properties);
+            }
+            if (queryComponent instanceof TransactionCommand transaction) {
+                return transaction(connection, transaction, sessionId, context.userName());
+            }
+            if (queryComponent instanceof Update update) {
+                return update(connection, update, sessionId);
+            }
+            if (queryComponent instanceof Refresh refresh) {
+                return refresh(connection, refresh);
+            }
+            if (queryComponent instanceof CalculatedFormula calculatedFormula) {
+                return calculatedFormula(connection, calculatedFormula);
+            }
+            throw new UnsupportedOperationException("the statement kind " + queryComponent.getClass().getSimpleName()
+                    + " is not run by this connector yet");
+        } finally {
+            connection.close();
         }
-        if (named.isEmpty()) {
-            LOGGER.warn("no catalog named and more than one available; nothing is run");
-            return null;
-        }
-        if (queryComponent instanceof Query query) {
-            return runQuery(query, properties, sessionId);
-        }
-        if (queryComponent instanceof DrillThrough drillThrough) {
-            return drillThrough(drillThrough, properties, sessionId);
-        }
-        if (queryComponent instanceof SqlQuery sqlQuery) {
-            return sql(sqlQuery, properties);
-        }
-        if (queryComponent instanceof TransactionCommand transaction) {
-            return transaction(connection, transaction, sessionId, context.userName());
-        }
-        if (queryComponent instanceof Update update) {
-            return update(connection, update, sessionId);
-        }
-        if (queryComponent instanceof Refresh refresh) {
-            return refresh(connection, refresh);
-        }
-        if (queryComponent instanceof CalculatedFormula calculatedFormula) {
-            return calculatedFormula(connection, calculatedFormula);
-        }
-        throw new UnsupportedOperationException("the statement kind " + queryComponent.getClass().getSimpleName()
-                + " is not run by this connector yet");
     }
 
     private EObject runQuery(Query query, PropertyList properties, String sessionId) {
@@ -279,10 +295,32 @@ public class OlapExecute {
             scenarios.begin(sessionId, connection.createScenario());
         } else if (transaction.getCommand() == Command.ROLLBACK) {
             scenarios.clear(sessionId);
+            releaseSessionCacheOverlay(connection);
         } else if (transaction.getCommand() == Command.COMMIT) {
-            commit(scenarios.require(sessionId), sessionId, userId);
+            try {
+                commit(scenarios.require(sessionId), sessionId, userId);
+            } finally {
+                // even a failed commit drops the overlay: it holds
+                // PRE-commit derived segments, and the next read rebuilds
+                // one from whatever is still pending
+                releaseSessionCacheOverlay(connection);
+            }
         }
         return null;
+    }
+
+    /**
+     * Drops the connection's private cache overlay at the transaction
+     * boundary. The overlay isolates uncommitted writeback values from the
+     * shared caches; reaping it here (instead of as a side effect of the
+     * manager getter) means a concurrently running statement on the same
+     * connection never loses its caches mid-query. Connection close reaps
+     * as well.
+     */
+    private static void releaseSessionCacheOverlay(Connection connection) {
+        if (connection.getContext() instanceof AbstractBasicContext<?> basicContext) {
+            basicContext.getAggregationManager().removeSegmentCacheManager(connection);
+        }
     }
 
     /**
@@ -295,7 +333,7 @@ public class OlapExecute {
      * has been written - a caller told "not committed" must still be holding what
      * did not commit.
      */
-    private void commit(Scenario scenario, String sessionId, String userId) {
+    void commit(Scenario scenario, String sessionId, String userId) {
         // Silence here was the worst answer available: without a writeback table
         // WritebackUtil.commit writes nothing and returns, and the client is told the
         // values are safe.
@@ -312,8 +350,11 @@ public class OlapExecute {
             // Only the cubes this scenario produced rows for, and each only its own.
             // Handing every cube the whole list wrote the same values into every
             // writeback table in the catalog.
-            for (Cube cube : scenario.pendingCubes()) {
+            for (Cube cube : List.copyOf(scenario.pendingCubes())) {
                 cube.commit(scenario.pendingRows(cube), userId);
+                // this cube's rows are permanent NOW: a retry after a later
+                // cube's failure must not insert them a second time
+                scenario.clearPendingRows(cube);
             }
         } catch (RuntimeException e) {
             LOGGER.error("Writeback[commit] failed", e);
@@ -336,12 +377,19 @@ public class OlapExecute {
         // modifyFact because the data can already be in the writeback table. Only this
         // cube's own pending rows: another cube's rows describe columns this one does
         // not have, and would answer the caller with values never meant for it.
-        cube.withPendingRows(scenario.pendingRows(cube), () -> {
-            for (UpdateClause clause : update.getUpdateClauses()) {
+        // One bracket PER clause: the snapshot is taken eagerly, so a shared
+        // bracket around the loop meant clause N read cell values that ignored
+        // clause N-1's freshly pending rows - deltas against a stale base.
+        for (UpdateClause clause : update.getUpdateClauses()) {
+            cube.withPendingRows(scenario.pendingRows(cube), () -> {
                 applyUpdateClause(connection, scenario, cube, update.getCubeName(), clause);
-            }
-            return null;
-        });
+                return null;
+            });
+        }
+        // once, after the loop, outside any bracket: flushing the catalog
+        // pool per clause tore down the very catalog the loop's cube
+        // belongs to while its bracket was still active
+        connection.getCacheControl(null).flushSchemaCache();
         return null;
     }
 
@@ -389,7 +437,6 @@ public class OlapExecute {
             scenario.addPendingRows(cube,
                     cube.getAllocationValues(tuple, resolvedValue, allocationPolicy, connection.getRole()));
         }
-        connection.getCacheControl(null).flushSchemaCache();
     }
 
     private interface Unparsed {

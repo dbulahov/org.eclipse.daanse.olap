@@ -90,7 +90,10 @@ public class ExecutionImpl implements Execution {
      */
     private final ExecutionContext executionContext;
 
-    private State state = State.FRESH;
+    // volatile: writers hold stateLock, but checkCancelOrTimeout reads and
+    // writes under the THIS monitor - without volatile there was no
+    // happens-before between a cancel and the query thread's state read
+    private volatile State state = State.FRESH;
 
     /**
      * This is a lock object to sync on when changing the {@link #state} variable.
@@ -103,7 +106,7 @@ public class ExecutionImpl implements Execution {
     private String outOfMemoryMsg;
 
     private LocalDateTime startTime;
-    private Optional<Duration> duration;
+    private final Optional<Duration> duration;
 
     /**
      * Absolute moment at which this execution has run out of time, or null when it
@@ -203,8 +206,6 @@ public class ExecutionImpl implements Execution {
                 phase, hitCountInc, missCountInc, pendingCountInc);
 
         context.getMonitor().accept(executionPhaseEvent);
-//    		new ExecutionPhaseEvent( System.currentTimeMillis(), context.getName(), connection
-//        .getId(), statement.getId(), id, phase, hitCountInc, missCountInc, pendingCountInc )
         ++phase;
         this.cellCacheHitCount = hitCount;
         this.cellCacheMissCount = missCount;
@@ -217,12 +218,15 @@ public class ExecutionImpl implements Execution {
     public void cancel() {
         synchronized (stateLock) {
             this.state = State.CANCELED;
-            this.cancelSqlStatements();
-            if (parent != null) {
-                // parent.cancel();
-            }
-            fireExecutionEndEvent();
         }
+        // OUTSIDE stateLock: canceling the statements is one JDBC network
+        // round-trip per statement (PG/MySQL open a new connection for a
+        // cancel), and the shepherd's single timer thread polls
+        // isCancelOrTimeout() - which takes this lock - for EVERY running
+        // query. One cancel against a wedged database must not suspend
+        // timeout enforcement server-wide.
+        this.cancelSqlStatements();
+        fireExecutionEndEvent();
     }
 
     /**
@@ -369,11 +373,13 @@ public class ExecutionImpl implements Execution {
             if (this.state == State.FRESH || this.state == State.RUNNING) {
                 this.state = State.DONE;
             }
-            // Unregister all segments
-            unregisterSegmentRequests();
-            // Fire up a monitor event.
-            fireExecutionEndEvent();
         }
+        // OUTSIDE stateLock: this is a synchronous actor round-trip, and
+        // isCancelOrTimeout()/checkCancelOrTimeout() polls (shepherd timer,
+        // every registerStatement) must never queue behind it.
+        unregisterSegmentRequests();
+        // Fire up a monitor event.
+        fireExecutionEndEvent();
     }
 
     /**
@@ -384,11 +390,22 @@ public class ExecutionImpl implements Execution {
         // We also have to cancel all requests for the current segments.
         final ExecutionContext currentContext = executionContext;
         AbstractBasicContext abc = (AbstractBasicContext) statement.getConnection().getContext();
-        final OlapSegmentCacheManager mgr = abc.getAggregationManager().getCacheMgr(null);
-        mgr.execute(new CacheCommand<Void>() {
+        final var aggregationManager = abc.getAggregationManager();
+        final OlapSegmentCacheManager shared = aggregationManager.getSegmentCacheManager();
+        // an isolated session (pending writeback / session caching)
+        // registered in ITS OVERLAY's index - sweeping only the shared one
+        // left the registrations (and any linked SQL statement) behind for
+        // the life of the overlay. Overlays share the shared manager's
+        // actor, so ONE command may sweep both registries.
+        final OlapSegmentCacheManager session =
+            aggregationManager.peekSegmentCacheManager(statement.getConnection());
+        shared.execute(new CacheCommand<Void>() {
             @Override
             public Void call() throws Exception {
-                mgr.getIndexRegistry().cancelExecutionSegments(ExecutionImpl.this);
+                shared.getIndexRegistry().cancelExecutionSegments(ExecutionImpl.this);
+                if (session != null && session != shared) {
+                    session.getIndexRegistry().cancelExecutionSegments(ExecutionImpl.this);
+                }
                 return null;
             }
 
@@ -399,9 +416,6 @@ public class ExecutionImpl implements Execution {
         });
     }
 
-    public final LocalDateTime getStartTime() {
-        return startTime;
-    }
 
     public Statement getDaanseStatement() {
         return statement;

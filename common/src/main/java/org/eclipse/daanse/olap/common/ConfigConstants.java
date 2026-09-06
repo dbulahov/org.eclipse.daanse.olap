@@ -33,7 +33,6 @@ package org.eclipse.daanse.olap.common;
  */
 public class ConfigConstants {
     public static final String QUERY_LIMIT = "queryLimit";
-    public static final String SEGMENT_CACHE = "segmentCache";
     public static final String ENABLE_TOTAL_COUNT = "enableTotalCount";
     public static final String SEGMENT_CACHE_MANAGER_NUMBER_CACHE_THREADS = "segmentCacheManagerNumberCacheThreads";
     public static final String CELL_BATCH_SIZE = "cellBatchSize";
@@ -71,6 +70,8 @@ public class ConfigConstants {
     public static final String FILTER_CHILDLESS_SNOWFLAKE_MEMBERS = "filterChildlessSnowflakeMembers";
     public static final String NULL_MEMBER_REPRESENTATION = "nullMemberRepresentation";
     public static final String RESULT_LIMIT = "resultLimit";
+    public static final String MEMBER_LIST_CACHE_MAX_WEIGHT = "memberListCacheMaxWeight";
+    public static final String NATIVE_TUPLE_CACHE_MAX_TUPLES = "nativeTupleCacheMaxTuples";
     public static final String TEST_EXP_DEPENDENCIES = "testExpDependencies";
     public static final String READ_AGGREGATES = "readAggregates";
     public static final String ALERT_NATIVE_EVALUATION_UNSUPPORTED = "alertNativeEvaluationUnsupported";
@@ -96,7 +97,6 @@ public class ConfigConstants {
     public static final String EXECUTE_DURATION_UNIT = "executeDurationUnit";
 
     public static final int QUERY_LIMIT_DEFAULT_VALUE = 40;
-    public static final String SEGMENT_CACHE_DEFAULT_VALUE = null;
     public static final boolean ENABLE_TOTAL_COUNT_DEFAULT_VALUE = false;
     public static final int SEGMENT_CACHE_MANAGER_NUMBER_CACHE_THREADS_DEFAULT_VALUE = 100;
     public static final int CELL_BATCH_SIZE_DEFAULT_VALUE = -1;
@@ -159,5 +159,9 @@ public class ConfigConstants {
     public static final String NULL_MEMBER_REPRESENTATION_DEFAULT_VALUE = "#null";
     /** 0 means no limit. */
     public static final int RESULT_LIMIT_DEFAULT_VALUE = 0;
+    /** Weight unit: one cached member in one cached list. */
+    public static final int MEMBER_LIST_CACHE_MAX_WEIGHT_DEFAULT_VALUE = 200_000;
+    /** Weight unit: one member of one cached native tuple. */
+    public static final int NATIVE_TUPLE_CACHE_MAX_TUPLES_DEFAULT_VALUE = 1_000_000;
 
 }

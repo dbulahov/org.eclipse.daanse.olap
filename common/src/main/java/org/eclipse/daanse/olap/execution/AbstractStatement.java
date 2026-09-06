@@ -57,7 +57,7 @@ public abstract class AbstractStatement implements Statement {
     /**
      * Query timeout, in milliseconds
      */
-    protected long queryTimeout;
+    private final long queryTimeout;
 
     /**
      * The current execution context, or null if query is not executing.
@@ -127,11 +127,6 @@ public abstract class AbstractStatement implements Statement {
     @Override
 	public ProfileHandler getProfileHandler() {
         return profileHandler;
-    }
-
-    @Override
-	public void setQueryTimeoutMillis(long timeoutMillis) {
-        this.queryTimeout = timeoutMillis;
     }
 
     @Override

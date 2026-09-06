@@ -13,10 +13,15 @@
  */
 package org.eclipse.daanse.olap.execution;
 
+import java.sql.Statement;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import org.eclipse.daanse.olap.api.execution.GuardedStatement;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 
 import java.time.Duration;
@@ -142,5 +147,49 @@ class ExecutionImplTimeoutTest {
 
         assertThatCode(execution::checkCancelOrTimeout).doesNotThrowAnyException();
         assertThat(execution.isCancelOrTimeout()).isFalse();
+    }
+
+    /**
+     * cancel() runs the per-statement JDBC cancel round-trips OUTSIDE
+     * stateLock: the shepherd's single timer thread polls
+     * isCancelOrTimeout() - which takes that lock - for every running
+     * query, and one cancel against a wedged database must not suspend
+     * timeout enforcement server-wide. Red while cancelSqlStatements ran
+     * inside the synchronized block.
+     */
+    @Test
+    void blockedStatementCancelDoesNotStallStatePolling() throws Exception {
+        ExecutionImpl execution = started(Optional.empty());
+        Statement blocked = mock(Statement.class);
+        CountDownLatch cancelEntered =
+            new CountDownLatch(1);
+        CountDownLatch release =
+            new CountDownLatch(1);
+        doAnswer(inv -> {
+            cancelEntered.countDown();
+            release.await(10, TimeUnit.SECONDS);
+            return null;
+        }).when(blocked).cancel();
+        execution.asContext().registerStatement(
+            new GuardedStatement(blocked));
+
+        Thread canceller = new Thread(execution::cancel);
+        canceller.start();
+        try {
+            assertThat(cancelEntered.await(5, TimeUnit.SECONDS)).isTrue();
+
+            // while the cancel round-trip hangs, the state poll must answer
+            long before = System.nanoTime();
+            boolean state = execution.isCancelOrTimeout();
+            long elapsedMillis = (System.nanoTime() - before) / 1_000_000;
+
+            assertThat(state).isTrue();
+            assertThat(elapsedMillis)
+                .as("isCancelOrTimeout must not queue behind a hung JDBC cancel")
+                .isLessThan(2_000);
+        } finally {
+            release.countDown();
+            canceller.join(TimeUnit.SECONDS.toMillis(10));
+        }
     }
 }

@@ -52,20 +52,61 @@ public abstract class AbstractBasicContext<C extends Connection> implements Cont
 
 	protected ResultShepherd shepherd;
 
-	@SuppressWarnings("unchecked")
 	private final List<Connection> connections = Collections.synchronizedList(new ArrayList<>());
 
-	@SuppressWarnings("unchecked")
 	private final List<Statement> statements =Collections.synchronizedList(new ArrayList<>());
 
-    protected EventBus eventBus;
+    // volatile: the actor and SQL threads read this unsynchronized, and a
+	// test tap installed after startup needs a happens-before edge
+	protected volatile EventBus eventBus;
 
 	protected OlapAggregationManager aggMgr;
 
-	protected CatalogCache schemaCache;
+	// the catalog pool (the historical "schema cache" - flushSchemaCache()
+	// keeps the old SPI name)
+	protected CatalogCache catalogCache;
 
 
-	private boolean shutdown = false;
+	// volatile: a Cleaner-driven shutdown runs on a foreign thread; the
+	// getters' guard reads must see it
+	private volatile boolean shutdown = false;
+
+	/**
+	 * Safety net for embedders that never call shutdown (OSGi deactivates,
+	 * the testkit closes, but direct constructions may not): the Cleaner
+	 * action must hold NO strong path back to the context, or the context
+	 * stays reachable through the Cleaner forever and the action can never
+	 * fire. The managers all reference the context, so the action carries
+	 * only the shepherd (context-free: executor, timer, an empty task list
+	 * once queries ended) and the aggregation manager's
+	 * {@code orphanCleanup()} runnable, whose contract is the same
+	 * no-context-capture rule. The catalog cache is deliberately absent -
+	 * it references the context and its heap dies with it; external
+	 * segment stores keep their entries by design. NOTE: with an attached
+	 * external cache the manager's async listener is registered on the
+	 * (OSGi-owned) service and pins the context - there, deactivation is
+	 * the teardown path and this net stays cold.
+	 */
+	private static final java.lang.ref.Cleaner CLEANER = java.lang.ref.Cleaner.create();
+	private java.lang.ref.Cleaner.Cleanable cleanable;
+	private java.util.concurrent.atomic.AtomicBoolean teardownDone;
+
+	/** The orphan teardown, deliberately without a reference to the context. */
+	private record OrphanAction(ResultShepherd shepherd, Runnable aggOrphanCleanup,
+			java.util.concurrent.atomic.AtomicBoolean done) implements Runnable {
+		@Override
+		public void run() {
+			if (!done.compareAndSet(false, true)) {
+				return;
+			}
+			try {
+				aggOrphanCleanup.run();
+				shepherd.shutdown();
+			} catch (RuntimeException | Error e) {
+				LOGGER.info("orphaned context cleanup failed", e);
+			}
+		}
+	}
 
 	private static final Logger LOGGER = LoggerFactory.getLogger(AbstractBasicContext.class);
 
@@ -90,14 +131,11 @@ public abstract class AbstractBasicContext<C extends Connection> implements Cont
 		return config;
 	}
 
-	@Override
-	protected void finalize() throws Throwable {
-		try {
-			super.finalize();
-			shutdown(true);
-		} catch (Throwable t) {
-			LOGGER.info("An exception was encountered while finalizing a RolapCatalog object instance.", t);
-		}
+	/** Arms the orphaned-context safety net; call once resources exist. */
+	protected void registerCleanup() {
+		this.teardownDone = new java.util.concurrent.atomic.AtomicBoolean(false);
+		this.cleanable = CLEANER.register(this,
+				new OrphanAction(shepherd, aggMgr.orphanCleanup(), teardownDone));
 	}
 
 	protected long getId() {
@@ -112,11 +150,6 @@ public abstract class AbstractBasicContext<C extends Connection> implements Cont
 		return this.shepherd;
 	}
 
-	// @Override
-	public List<String> getKeywords() {
-		return KEYWORD_LIST;
-	}
-
 	public OlapAggregationManager getAggregationManager() {
 		if (shutdown) {
 			throw new OlapRuntimeException(SERVER_ALREADY_SHUTDOWN);
@@ -125,22 +158,22 @@ public abstract class AbstractBasicContext<C extends Connection> implements Cont
 	}
 
 	protected void shutdown() {
-		this.shutdown(false);
-	}
-
-	private void shutdown(boolean silent) {
-
 		if (shutdown) {
-			if (silent) {
-				return;
-			}
-			throw new OlapRuntimeException("Server already shutdown.");
+			throw new OlapRuntimeException(SERVER_ALREADY_SHUTDOWN);
 		}
 		this.shutdown = true;
-		schemaCache.clear();
-		aggMgr.shutdown();
-
-		shepherd.shutdown();
+		// the FULL ordered teardown - the orphan action is only the
+		// context-free subset. The shared once-latch keeps the two from
+		// running on top of each other.
+		if (teardownDone == null || teardownDone.compareAndSet(false, true)) {
+			catalogCache.clear();
+			aggMgr.shutdown();
+			shepherd.shutdown();
+		}
+		if (cleanable != null) {
+			// latch already spent: this only unregisters the safety net
+			cleanable.clean();
+		}
 	}
 
 	@Override
@@ -150,7 +183,7 @@ public abstract class AbstractBasicContext<C extends Connection> implements Cont
 					connections.size());
 		}
 		if (shutdown) {
-			throw new OlapRuntimeException("Server already shutdown.");
+			throw new OlapRuntimeException(SERVER_ALREADY_SHUTDOWN);
 		}
 		connections.add(connection);
 
@@ -158,8 +191,6 @@ public abstract class AbstractBasicContext<C extends Connection> implements Cont
 								new ServertEventCommon(
 				EventCommon.ofNow(), getName()), connection.getId()));
 		eventBus.accept(connectionStartEvent);
-//				new ConnectionStartEvent(System.currentTimeMillis(), connection.getContext().getName(),
-//				connection.getId())
 	}
 
 	@Override
@@ -169,7 +200,7 @@ public abstract class AbstractBasicContext<C extends Connection> implements Cont
 					connections.size());
 		}
 		if (shutdown) {
-			throw new OlapRuntimeException("Server already shutdown.");
+			throw new OlapRuntimeException(SERVER_ALREADY_SHUTDOWN);
 		}
 		connections.remove(connection);
 
@@ -178,13 +209,12 @@ public abstract class AbstractBasicContext<C extends Connection> implements Cont
 										new ServertEventCommon(
 										EventCommon.ofNow(), getName()), connection.getId()));
 		eventBus.accept(connectionEndEvent);
-//		new ConnectionEndEvent(System.currentTimeMillis(), getName(), connection.getId())
 	}
 
 	@Override
 	public synchronized void addStatement(Statement statement) {
 		if (shutdown) {
-			throw new OlapRuntimeException("Server already shutdown.");
+			throw new OlapRuntimeException(SERVER_ALREADY_SHUTDOWN);
 		}
 		if (LOGGER.isDebugEnabled()) {
 			LOGGER.debug("addStatement , id={}, statements={}, connections={}", id, statements.size(),
@@ -199,8 +229,6 @@ public abstract class AbstractBasicContext<C extends Connection> implements Cont
 						connection.getId()),
 				statement.getId()));
 		eventBus.accept(mdxStatementStartEvent);
-//		new StatementStartEvent(System.currentTimeMillis(), connection.getContext().getName(),
-//				connection.getId(), statement.getId())
 	}
 
 	@Override
@@ -210,7 +238,7 @@ public abstract class AbstractBasicContext<C extends Connection> implements Cont
 					connections.size());
 		}
 		if (shutdown) {
-			throw new OlapRuntimeException("Server already shutdown.");
+			throw new OlapRuntimeException(SERVER_ALREADY_SHUTDOWN);
 		}
 		statements.remove(statement);
 		final Connection connection = statement.getDaanseConnection();
@@ -222,14 +250,12 @@ public abstract class AbstractBasicContext<C extends Connection> implements Cont
 						connection.getId()), statement.getId()));
 
 		eventBus.accept(mdxStatementEndEvent);
-//				new StatementEndEvent(System.currentTimeMillis(), connection.getContext().getName(),
-//				connection.getId(), statement.getId())
 	}
 
 	@Override
 	public EventBus getMonitor() {
 		if (shutdown) {
-			throw new OlapRuntimeException("Server already shutdown.");
+			throw new OlapRuntimeException(SERVER_ALREADY_SHUTDOWN);
 		}
 		return eventBus;
 	}
@@ -245,7 +271,7 @@ public abstract class AbstractBasicContext<C extends Connection> implements Cont
 
 	@Override
 	public CatalogCache getCatalogCache() {
-		return schemaCache;
+		return catalogCache;
 	}
 
 	@Override

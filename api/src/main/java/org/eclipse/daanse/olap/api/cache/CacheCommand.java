@@ -13,10 +13,9 @@
  */
 package org.eclipse.daanse.olap.api.cache;
 
-import org.eclipse.daanse.olap.api.Message;
 import org.eclipse.daanse.olap.api.execution.ExecutionContext;
 
-public interface CacheCommand<T> extends Message {
+public interface CacheCommand<T> {
 
     ExecutionContext getExecutionContext();
 

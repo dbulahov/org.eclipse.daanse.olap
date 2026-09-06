@@ -15,7 +15,7 @@ package org.eclipse.daanse.olap.api.cache;
 
 import org.eclipse.daanse.olap.api.execution.Execution;
 
-public interface OlapSegmentCacheIndex {
+public interface OlapSegmentCacheIndexRegistry {
 
     void cancelExecutionSegments(Execution executionImpl);
 

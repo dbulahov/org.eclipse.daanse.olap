@@ -20,13 +20,15 @@ package org.eclipse.daanse.olap.api.execution;
  * The state transitions are:
  * 
  * <pre>
- * RUNNING → CANCELED (via cancel())
- * RUNNING → TIMEOUT  (via checkCancelOrTimeout() when timeout exceeded)
- * RUNNING → ERROR    (when an error occurs)
- * RUNNING → DONE     (when execution completes successfully)
+ * RUNNING → CANCELED (via cancel(), CAS on the ROOT context)
+ * RUNNING → TIMEOUT  (via checkCancelOrTimeout(), CAS on the ROOT context)
  * </pre>
  *
- * @see ExecutionContext#state()
+ * Both transitions are compare-and-set on the root of the context tree:
+ * cancel() runs as the timeout's own side effect, and a recorded TIMEOUT
+ * deliberately survives it. ERROR and DONE are not used by
+ * {@link ExecutionContext} - the Execution implementation tracks those in
+ * its own state.
  */
 public enum State {
     /**

@@ -44,21 +44,21 @@ import org.eclipse.daanse.olap.api.element.Member;
  *
  * Methods concerning cell cache: createMemberRegion(Member, boolean)
  * createMemberRegion(boolean, Member, boolean, Member, boolean)
- * createUnionRegion(org.eclipse.daanse.olap.api.CacheControl.CellRegion[])
- * createCrossjoinRegion(org.eclipse.daanse.olap.api.CacheControl.CellRegion[])
- * createMeasuresRegion(Cube)}
- * flush(org.eclipse.daanse.olap.api.CacheControl.CellRegion)
+ * createUnionRegion(CellRegion[])
+ * createCrossjoinRegion(CellRegion[])
+ * createMeasuresRegion(Cube)
+ * flush(CellRegion)
  *
  * Methods concerning member cache: createMemberSet(Member, boolean)
  * createMemberSet(boolean, Member, boolean, Member, boolean)
  * createAddCommand(Member) createDeleteCommand(Member)
- * createDeleteCommand(org.eclipse.daanse.olap.api.CacheControl.MemberSet)
+ * createDeleteCommand(MemberSet)
  * createCompoundCommand(java.util.List)
- * createCompoundCommand(org.eclipse.daanse.olap.api.CacheControl.MemberEditCommand[])
+ * createCompoundCommand(MemberEditCommand[])
  * createSetPropertyCommand(Member, String, Object)
- * createSetPropertyCommand(org.eclipse.daanse.olap.api.CacheControl.MemberSet,java.util.Map)
- * flush(org.eclipse.daanse.olap.api.CacheControl.MemberSet)
- * execute(org.eclipse.daanse.olap.api.CacheControl.MemberEditCommand)
+ * createSetPropertyCommand(MemberSet,java.util.Map)
+ * flush(MemberSet)
+ * execute(MemberEditCommand)
  *
  * @author jhyde
  * @since Sep 27, 2006
@@ -225,14 +225,6 @@ public interface CacheControl {
      */
     void flush(MemberSet set);
 
-    /**
-     * Prints the state of the member cache as it pertains to a given member set.
-     * 
-     * @param pw  the output target
-     * @param set the MemberSet of interest
-     */
-    void printCacheState(PrintWriter pw, MemberSet set);
-
     // edit member cache contents
 
     /**
@@ -375,7 +367,7 @@ public interface CacheControl {
      * Member sets can be created using methods CacheControl#createMemberSet(Member,
      * boolean), CacheControl#createMemberSet(boolean, Member, boolean, Member,
      * boolean),
-     * CacheControl#createUnionSet(org.eclipse.daanse.olap.api.CacheControl.MemberSet[]).
+     * CacheControl#createUnionSet(MemberSet[]).
      */
     public interface MemberSet {
     }

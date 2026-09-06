@@ -23,8 +23,6 @@ public interface WritebackCell {
 
     AllocationPolicy getAllocationPolicy();
 
-    Member[] getMembersByOrdinal();
-
     double getAtomicCellCount();
 
     /**

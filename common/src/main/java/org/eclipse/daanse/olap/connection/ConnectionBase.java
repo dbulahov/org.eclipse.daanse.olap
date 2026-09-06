@@ -94,7 +94,7 @@ public abstract class ConnectionBase implements Connection {
      * support customized parser behavior. That is why this method is not part
      * of the Connection interface.
      *
-     * See test case mondrian.olap.CustomizedParserTest.
+     * 
      *
      * @param statement Evaluation context
      * @param queryToParse MDX query that requires special parsing

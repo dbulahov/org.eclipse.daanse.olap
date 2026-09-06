@@ -17,4 +17,17 @@ public interface CatalogCache {
 
     void clear();
 
+    /**
+     * Snapshot of every catalog currently pooled (live and parked tiers).
+     * The engine iterates this for cross-catalog work - segment-store
+     * priming, checksum-wide event fan-out, stats capture - instead of
+     * downcasting the cache to its implementation. Default empty for
+     * caches without a pool - note that an implementation WITH pooled
+     * catalogs must override this, or priming and event fan-out silently
+     * see nothing.
+     */
+    default java.util.List<? extends org.eclipse.daanse.olap.api.element.Catalog> getCachedCatalogs() {
+        return java.util.List.of();
+    }
+
 }

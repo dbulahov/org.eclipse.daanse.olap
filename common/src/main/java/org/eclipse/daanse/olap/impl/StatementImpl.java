@@ -36,7 +36,6 @@ import org.eclipse.daanse.olap.api.query.component.Query;
 import org.eclipse.daanse.olap.api.query.component.QueryComponent;
 import org.eclipse.daanse.olap.api.result.Cell;
 import org.eclipse.daanse.olap.api.result.CellSet;
-import org.eclipse.daanse.olap.api.result.Result;
 import org.eclipse.daanse.olap.common.ExecuteDurationUtil;
 import org.eclipse.daanse.olap.connection.ConnectionBase;
 import org.eclipse.daanse.olap.execution.ExecutionImpl;
@@ -66,12 +65,6 @@ public class StatementImpl extends org.eclipse.daanse.olap.execution.AbstractSta
     @Override
     public Connection getConnection() {
         return connection;
-    }
-
-    @Override
-    public Result executeSelect(String mdx) {
-    	Query query = connection.parseQuery(mdx);
-        return connection.execute(query);
     }
 
     @Override
@@ -146,10 +139,8 @@ public class StatementImpl extends org.eclipse.daanse.olap.execution.AbstractSta
             }
             return resultSet;
         } else if (queryComponent instanceof Explain explain) {
-            String plan = explainInternal(explain.getQuery());
             return null;
 
-            //olap4jConnection.factory.newFixedResultSet(
             //    connection,
             //    Collections.singletonList("PLAN"),
             //    Collections.singletonList(
@@ -182,7 +173,6 @@ public class StatementImpl extends org.eclipse.daanse.olap.execution.AbstractSta
                 }
             }
 
-            //if (olap4jConnection.preferList) {
             query.setResultStyle(ResultStyle.LIST);
             //}
             this.query = query;
