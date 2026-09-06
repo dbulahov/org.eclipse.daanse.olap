@@ -23,8 +23,12 @@
  */
 package org.eclipse.daanse.olap.spi;
 
-import java.util.ArrayList;
+import java.io.Serializable;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
+
+import org.eclipse.daanse.olap.util.ByteString;
 
 /**
  * SPI definition of the segments cache.
@@ -32,45 +36,19 @@ import java.util.List;
  * Lookups are performed using {@link SegmentHeader}s and
  * {@link SegmentBody}s. Both are immutable and fully serializable.
  *
- * There are a few ways to declare a SegmentCache implementation in
- * Mondrian. The first one is to set the
- * segment cache configuration.
+ * Implementations register as OSGi services of this type (the engine binds
+ * and unbinds them dynamically) or attach programmatically via the cache
+ * manager. One cache instance may serve several engine instances at once;
+ * the provider owns the cache lifecycle, the engine never calls
+ * {@link #tearDown} on a cache it merely detaches.
  *
- * The second one is to use the Java Services API. This is the preferred
- * mean. You will need to create a jar file, accessible through the same
- * class loader as Mondrian, and add a file called
- * <code>/META-INF/services/mondrian.spi.SegmentCache</code> which contains
- * the name of the segment cache implementation to use.
+ * Implementations are expected to be thread-safe: multiple requests arrive
+ * concurrently from different threads.
  *
- * The third method is to use the {@link SegmentCacheInjector}.
- * This is to be used as a last resort, in environments where the
- * cache implementation is not part of the same class loader as Mondrian.
- * In those cases, Mondrian can't dynamically load the segment cache class.
- * The injector serves as an IoC-like service.
- *
- * All of the segment caches that Mondrian discovers, throughout all
- * of these means of discovery, will be used simultaneously. It is not possible
- * to register new segment caches for a previously existing instance
- * of a Mondrian server. The caches are scanned and configured when each
- * Mondrian instance gets created.
- *
- * Implementations are expected to be thread-safe. Mondrian is likely to
- * submit multiple requests at the same time, from different threads. It is the
- * responsibility of the cache implementation to maintain a consistent
- * state.
- *
- * Implementations must implement a time-out policy, if needed. Mondrian
- * knows that a call to the cache might take a while. (Mondrian uses worker
- * threads to call into the cache for precisely that reason.) Left to its
- * own devices, Mondrian will wait forever for a call to complete. The cache
- * implementation might know that a call to {@link #get} that has taken 100
- * milliseconds already is probably hung, so it should return null or throw
- * an exception. Then Mondrian can get on with its life, and get the segment
- * some other way.
- *
- * Implementations must provide a default empty constructor.
- * Mondrian creates one segment cache instance per Mondrian server.
- * There could be more than one Mondrian server running in the same JVM.
+ * Implementations must implement a time-out policy, if needed. The engine
+ * calls the cache from worker threads and would otherwise wait forever; a
+ * call that hangs should return null or throw so the segment can be loaded
+ * another way.
  *
  * @author LBoudreau
  */
@@ -100,6 +78,77 @@ public interface SegmentCache {
     List<SegmentHeader> getSegmentHeaders();
 
     /**
+     * One star a cache holds segments for: the catalog checksum in its hex
+     * form plus the fact table name — together the prefix of every segment
+     * key of that star.
+     */
+    record StarKey(String schemaChecksum, String rolapStarFactTableName)
+            implements Serializable {
+
+        public static StarKey of(SegmentHeader header) {
+            return new StarKey(header.schemaChecksum.toString(),
+                    header.rolapStarFactTableName);
+        }
+    }
+
+    /**
+     * The stars this cache holds segments for. Attaching a cache asks THIS
+     * instead of pulling the full header inventory over the wire; stores
+     * answer it from their keys alone (a distinct scan or key-prefix walk),
+     * never fetching headers or bodies. The default derives it from the
+     * full listing, for stores without a cheaper answer.
+     */
+    default Set<StarKey> knownStars() {
+        Set<StarKey> stars = new LinkedHashSet<>();
+        for (SegmentHeader header : getSegmentHeaders()) {
+            stars.add(StarKey.of(header));
+        }
+        return stars;
+    }
+
+    /**
+     * Returns the headers of one star's segments: those whose schema
+     * checksum and fact table match. The default filters the full listing;
+     * stores whose keys carry both values answer with a prefix match
+     * instead of shipping the whole inventory.
+     *
+     * @param schemaChecksum the catalog content checksum
+     * @param rolapStarFactTableName the star's fact table alias
+     * @return matching headers
+     */
+    default List<SegmentHeader> getSegmentHeaders(
+            ByteString schemaChecksum,
+            String rolapStarFactTableName) {
+        return getSegmentHeaders().stream()
+                .filter(header -> header.schemaChecksum.equals(schemaChecksum)
+                        && header.rolapStarFactTableName.equals(rolapStarFactTableName))
+                .toList();
+    }
+
+    /**
+     * Moves a segment to a new header carrying the identical body — the
+     * flush-constrain path shrinks a header without touching the cells.
+     * The default copies through get/remove/put; stores with key-level
+     * rename skip the body transfer.
+     *
+     * @param oldHeader the header the body is stored under
+     * @param newHeader the header it moves to
+     * @return whether the body actually moved - false when the store held
+     *         no body under the old header, or the target was already taken
+     */
+    default boolean rename(SegmentHeader oldHeader, SegmentHeader newHeader) {
+        final SegmentBody body = get(oldHeader);
+        final boolean existed = remove(oldHeader);
+        if (body != null) {
+            put(newHeader, body);
+        }
+        // success means the body MOVED. Reporting a bodiless removal (the
+        // body was evicted between get and remove) as true made the caller
+        // publish the birth of a header no store holds.
+        return existed && body != null;
+    }
+
+    /**
      * Stores a segment data in the cache.
      *
      * @return Whether the cache write succeeded
@@ -119,7 +168,10 @@ public interface SegmentCache {
     boolean remove(SegmentHeader header);
 
     /**
-     * Tear down and clean up the cache.
+     * Closes this cache instance and releases its resources (connections,
+     * listeners, local buffers). A shared backing store keeps its entries —
+     * other instances on the same store continue to serve them. Idempotent;
+     * after tearDown every read is a miss and every write returns false.
      */
     void tearDown();
 
@@ -139,31 +191,18 @@ public interface SegmentCache {
      */
     void removeListener(SegmentCacheListener listener);
 
-    /**
-     * Tells Mondrian whether this segment cache uses the {@link SegmentHeader}
-     * objects as an index, thus preserving them in a serialized state, or if
-     * it uses its identification number only.
-     *
-     * Not using a rich index prevents
-     * Mondrian from doing partial cache invalidation.
-     *
-     * It is assumed that this method returns fairly quickly, and for a given
-     * cache always returns the same value.
-     *
-     * @return Whether this segment cache preserves headers in serialized state
-     */
-    boolean supportsRichIndex();
 
     /**
      * {@link SegmentCacheListener} objects are used to listen
      * to the state of the cache and be notified of changes to its
-     * state or its entries. Mondrian will automatically register
-     * a listener with the implementations it uses.
+     * state or its entries.
      *
-     * Implementations of SegmentCache should only send events if the
-     * cause of the event is not Mondrian itself. Only in cases where
-     * the cache gets updated by other Mondrian nodes or by a third
-     * party application is it required to use this interface.
+     * A cache fires its own put/remove synchronously with
+     * {@code isLocal() == true}; changes made by other nodes or third
+     * parties arrive as foreign events with {@code isLocal() == false},
+     * and the own-node echo of a distributed store is filtered out. The
+     * engine ignores local events (it made the change itself) and applies
+     * foreign ones to its index.
      */
     interface SegmentCacheListener {
         /**
@@ -203,37 +242,12 @@ public interface SegmentCache {
             SegmentHeader getSource();
 
             /**
-             * Tells whether or not this event was a local event or
-             * an event triggered by an operation on a remote node.
-             * If the implementation cannot differentiate or doesn't
-             * support remote nodes, always return false.
+             * True for an event fired by this cache instance's own
+             * put/remove; false for a change made by a remote node or a
+             * third party. The engine ignores local events.
              */
             boolean isLocal();
         }
     }
 
-    /**
-     * The {@link SegmentCacheInjector} is a means to inject
-     * {@link SegmentCache} instances directly into Mondrian,
-     * instead of passing a class name. This is particularly
-     * useful in plugin environments, like the Pentaho Platform.
-     * Mondrian can't always get access to the child class loader,
-     * therefore passing an instance is the only way.
-     *
-     * It is recommended to use the Java Services API when possible
-     * instead of the injector. See {@link SegmentCache}.
-     */
-    public static class SegmentCacheInjector {
-        private static final List<SegmentCache> caches =
-            new ArrayList<>();
-        /**
-         * Adds a {@link SegmentCache} instance for Mondrian's use.
-         */
-        public static void addCache(SegmentCache cache) {
-            caches.add(cache);
-        }
-        public static List<SegmentCache> getCaches() {
-            return caches;
-        }
-    }
 }

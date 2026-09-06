@@ -50,6 +50,16 @@ public interface SegmentBody extends Serializable {
     Map<CellKey, Object> getValueMap();
 
     /**
+     * Number of populated cells. Implementations count without
+     * materializing the value map; counters and cache weighers use this.
+     *
+     * @return number of populated cells
+     */
+    default int cellCount() {
+        return getValueMap().size();
+    }
+
+    /**
      * Returns an array of values.
      *
      * Use only for dense segments.

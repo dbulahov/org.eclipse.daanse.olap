@@ -31,62 +31,75 @@ package org.eclipse.daanse.olap.key;
 
 import java.io.Serializable;
 import java.util.BitSet;
-import java.util.Iterator;
+import java.util.function.IntConsumer;
 
 /**
- * Represents a set of bits.
+ * A fixed-capacity set of bit positions — in the engine: "which star
+ * columns are constrained". BitKeys key the segment caches (working
+ * store, index, batch identity), order the compound-predicate maps and
+ * travel in the segment wire form ({@link #toLongArray()}), so value,
+ * hash and order equality are defined ACROSS implementations and never
+ * depend on capacity.
  *
- * Unlike {@link java.util.BitSet}, the number of bits cannot be changed
- * after the BitKey is created. This allows us to optimize.
+ * Three implementations cover the widths: {@link Small} (one long, up
+ * to 64 bits), {@link Mid128} (two longs, up to 128) and {@link Big}
+ * (an array of 64-bit chunks). {@link Factory#makeBitKey(int)} picks
+ * one; unlike {@link java.util.BitSet} a key never grows — mutations
+ * outside the capacity throw.
  *
- * If you have a collection of immutable objects, each of which has a unique
- * positive number and you wish to do comparisons between subsets of those
- * objects testing for equality, then encoding the subsets as BitKeys is very
- * efficient.
- *
- * There are two implementations that target groups of objects with maximum
- * number less than 64 and less than 128; and there is one implements that is
- * general for any positive number.
- *
- * One caution: if the maximum number assigned to one of the
- * objects is large, then this representation might be sparse and therefore
- * not efficient.
+ * Life cycle: the mutable key IS the builder. Build with
+ * {@link #set(int)}, then {@link #freeze()} at the publication point —
+ * a frozen key refuses mutation by type, and freezing a frozen key
+ * returns the same instance. A key published as a map key or identity
+ * component must be frozen, or at least never mutated again; the wide
+ * implementation caches its hash under this contract.
  *
  * @author Richard M. Emberson
  */
 public interface BitKey
-        extends Serializable, Comparable<BitKey>, Iterable<Integer>
+        extends Serializable, Comparable<BitKey>
 {
     /**
-     * The BitKey with no bits set.
+     * The BitKey with no bits set. Shared and immutable: every mutator
+     * throws {@link UnsupportedOperationException}, and deserialization
+     * resolves back to this instance.
      */
-    BitKey EMPTY = Factory.makeBitKey(0);
+    BitKey EMPTY = new Small.Empty();
 
     /**
-     * Sets the bit at the specified index to the specified value.
+     * Sets the bit at the specified position to the specified value.
+     * Mutates this key in place — never call on a published key.
+     * Throws {@link IllegalArgumentException} for a negative or
+     * over-capacity position.
      */
-    void set(int bitIndex, boolean value);
+    void set(int pos, boolean value);
 
     /**
-     * Sets the bit at the specified index to <code>true</code>.
+     * Sets the bit at the specified position to <code>true</code>.
+     * Mutates this key in place — never call on a published key.
+     * Throws {@link IllegalArgumentException} for a negative or
+     * over-capacity position.
      */
-    void set(int bitIndex);
+    void set(int pos);
 
     /**
-     * Returns the value of the bit with the specified index. The value
-     * is true if the bit with the index bitIndex
-     * is currently set in this BitKey; otherwise, the result
-     * is false.
+     * Returns whether the bit at the specified position is set. A
+     * negative or over-capacity position reads as false — those bits do
+     * not exist and are never set.
      */
-    boolean get(int bitIndex);
+    boolean get(int pos);
 
     /**
-     * Sets the bit specified by the index to <code>false</code>.
+     * Sets the bit at the specified position to <code>false</code>.
+     * Mutates this key in place — never call on a published key.
+     * Throws {@link IllegalArgumentException} for a negative or
+     * over-capacity position.
      */
-    void clear(int bitIndex);
+    void clear(int pos);
 
     /**
      * Sets all of the bits in this BitKey to <code>false</code>.
+     * Mutates this key in place — never call on a published key.
      */
     void clear();
 
@@ -101,30 +114,29 @@ public interface BitKey
     boolean isSuperSetOf(BitKey bitKey);
 
     /**
-     * Or the parameter <code>BitKey</code> with <code>this</code>.
+     * Returns a NEW BitKey with every bit set that is set in this key or
+     * the parameter; neither operand is mutated. The result carries the
+     * larger operand's capacity.
      *
      * @param bitKey Bit key
      */
     BitKey or(BitKey bitKey);
 
-    /**
-     * XOr the parameter BitKey with this.
-     *
-     * @param bitKey Bit key
-     */
-    BitKey orNot(BitKey bitKey);
 
     /**
-     * Returns the boolean AND of this bitkey and the given bitkey.
+     * Returns a NEW BitKey holding the boolean AND of this key and the
+     * parameter; neither operand is mutated. The result keeps the
+     * receiver's capacity, except on the wide implementation, which
+     * narrows to the smaller operand.
      *
      * @param bitKey Bit key
      */
     BitKey and(BitKey bitKey);
 
     /**
-     * Returns a BitKey containing all of the bits in this
-     * BitSet whose corresponding
-     * bit is NOT set in the specified BitSet.
+     * Returns a NEW BitKey containing all of the bits in this key whose
+     * corresponding bit is NOT set in the parameter; neither operand is
+     * mutated. The result keeps the receiver's capacity.
      */
     BitKey andNot(BitKey bitKey);
 
@@ -136,12 +148,24 @@ public interface BitKey
     BitKey copy();
 
     /**
-     * Returns an empty BitKey of the same type. This is the same
-     * as calling {@link #copy} followed by {@link #clear()}.
+     * Returns an empty BitKey of the same type and the same capacity —
+     * the same as calling {@link #copy} followed by {@link #clear()}.
+     * This is the way to transport a key's capacity to a sibling key.
      *
      * @return BitKey of same type
      */
     BitKey emptyCopy();
+
+    /**
+     * Returns an immutable key with this key's bits: mutators throw
+     * {@link UnsupportedOperationException}; value, hash and wire form
+     * match the mutable original, and {@link #copy()}/{@link #emptyCopy()}
+     * hand back ordinary mutable keys. Freezing a frozen key returns the
+     * SAME instance, so publication points call freeze() unconditionally.
+     * A frozen key is safe as a map key or identity component by type,
+     * not by convention.
+     */
+    BitKey freeze();
 
     /**
      * Returns true if this BitKey contains no bits that are set
@@ -155,19 +179,37 @@ public interface BitKey
     boolean intersects(BitKey bitKey);
 
     /**
-     * Returns a {@link BitSet} with the same contents as this BitKey.
+     * Returns the set bits as little-endian 64-bit words with trailing
+     * zero words trimmed — exactly {@link BitSet#toLongArray()} of the
+     * same bits. This is the canonical wire form of a key.
      */
-    BitSet toBitSet();
+    long[] toLongArray();
 
     /**
-     * An Iterator over the bit positions.
-     * For example, if the BitKey had positions 3 and 4 set, then
-     * the Iterator would return the values 3 and then 4. The bit
-     * positions returned by the iterator are in the order, from
-     * smallest to largest, as they are set in the BitKey.
+     * Returns a {@link BitSet} with the same contents as this BitKey.
      */
-    @Override
-	Iterator<Integer> iterator();
+    default BitSet toBitSet() {
+        return BitSet.valueOf(toLongArray());
+    }
+
+    /**
+     * Calls the consumer for every set bit position, from smallest to
+     * largest — the primitive walk over the key, built on
+     * {@link #nextSetBit(int)}.
+     */
+    default void forEachSetBit(IntConsumer consumer) {
+        for (int pos = nextSetBit(0); pos >= 0; pos = nextSetBit(pos + 1)) {
+            consumer.accept(pos);
+        }
+    }
+
+    /**
+     * Whether every bit set in this key is also set in the parameter
+     * bitKey — the mirror of {@link #isSuperSetOf(BitKey)}.
+     */
+    default boolean isSubSetOf(BitKey bitKey) {
+        return bitKey.isSuperSetOf(this);
+    }
 
     /**
      * Returns the index of the first bit that is set to <code>true</code>
@@ -178,7 +220,7 @@ public interface BitKey
      * use the following loop:
      *
      * 
-     * for (int i = bk.nextSetBit(0); i >= 0; i = bk.nextSetBit(i + 1)) {
+     * for (int i = result.nextSetBit(0); i >= 0; i = result.nextSetBit(i + 1)) {
      *     // operate on index i here
      * }
      *
@@ -195,14 +237,17 @@ public interface BitKey
      */
     int cardinality();
 
-    public abstract class Factory {
+    public final class Factory {
 
         private Factory() {
             // constructor
         }
 
         /**
-         * Creates a {@link BitKey} with a capacity for a given number of bits.
+         * Creates a {@link BitKey} sized for a given number of bits. The
+         * actual capacity rounds up to the chosen implementation's width
+         * (64, 128, or whole 64-bit chunks); value equality never depends
+         * on capacity.
          * @param size Number of bits in key
          */
         public static BitKey makeBitKey(int size) {
@@ -219,20 +264,30 @@ public interface BitKey
                 String msg = new StringBuilder("Negative size \"").append(size).append("\" not allowed").toString();
                 throw new IllegalArgumentException(msg);
             }
-            final BitKey bk;
+            final BitKey result;
             if (size < 64) {
-                bk = new BitKey.Small();
+                result = new BitKey.Small();
             } else if (size < 128) {
-                bk = new BitKey.Mid128();
+                result = new BitKey.Mid128();
             } else {
-                bk = new BitKey.Big(size);
+                result = new BitKey.Big(size);
             }
             if (init) {
                 for (int i = 0; i < size; i++) {
-                    bk.set(i, init);
+                    result.set(i, init);
                 }
             }
-            return bk;
+            return result;
+        }
+
+        /**
+         * Creates a {@link BitKey} from its canonical wire form — the
+         * words {@link BitKey#toLongArray()} produced. Sized by the
+         * highest set bit like {@link #makeBitKey(BitSet)}: the variant
+         * may narrow, value and hash equality are preserved.
+         */
+        public static BitKey fromLongArray(long[] words) {
+            return makeBitKey(BitSet.valueOf(words));
         }
 
         /**
@@ -251,20 +306,22 @@ public interface BitKey
     }
 
     /**
-     * Abstract implementation of {@link BitKey}.
+     * Shared base of the implementations: the static bit arithmetic
+     * (chunk = one long of 64 bits) and the two-argument
+     * {@link #set(int, boolean)}.
      */
     abstract class AbstractBitKey implements BitKey {
         private static final long serialVersionUID = -2942302671676103450L;
-        // chunk is a long, which has 64 bits
-        protected static final int CHUNK_BIT_COUNT = 6;
-        protected static final int MASK = 63;
-        protected static final long WORD_MASK = 0xffffffffffffffffL;
+        /** Shift from bit position to chunk index (a chunk holds 64 bits). */
+        protected static final int CHUNK_SHIFT = 6;
+        /** Mask of the bit position within its chunk. */
+        protected static final int CHUNK_MASK = 63;
 
         /**
          * Creates a chunk containing a single bit.
          */
         protected static long bit(int pos) {
-            return (1L << (pos & MASK));
+            return (1L << (pos & CHUNK_MASK));
         }
 
         /**
@@ -272,7 +329,7 @@ public interface BitKey
          * Bits 0 to 63 fall in chunk 0, bits 64 to 127 fall into chunk 1.
          */
         protected static int chunkPos(int size) {
-            return (size >> CHUNK_BIT_COUNT);
+            return (size >> CHUNK_SHIFT);
         }
 
         /**
@@ -281,29 +338,7 @@ public interface BitKey
          * <p>0 bits requires 0 chunks; 1 - 64 bits requires 1 chunk; etc.
          */
         protected static int chunkCount(int size) {
-            return (size + 63) >> CHUNK_BIT_COUNT;
-        }
-
-        /**
-         * Returns the number of one-bits in the two's complement binary
-         * representation of the specified long value.  This function
-         * is sometimes referred to as the population count.
-         *
-         * (Copied from {@link java.lang.Long#bitCount(long)}, which was
-         * introduced in JDK 1.5, but we need the functionality in JDK 1.4.)
-         *
-         * @return the number of one-bits in the two's complement binary
-         *     representation of the specified long value.
-         * @since 1.5
-         */
-         protected static int bitCount(long i) {
-            i = i - ((i >>> 1) & 0x5555555555555555L);
-            i = (i & 0x3333333333333333L) + ((i >>> 2) & 0x3333333333333333L);
-            i = (i + (i >>> 4)) & 0x0f0f0f0f0f0f0f0fL;
-            i = i + (i >>> 8);
-            i = i + (i >>> 16);
-            i = i + (i >>> 32);
-            return (int)i & 0x7f;
+            return (size + 63) >> CHUNK_SHIFT;
         }
 
         @Override
@@ -312,70 +347,6 @@ public interface BitKey
                 set(pos);
             } else {
                 clear(pos);
-            }
-        }
-
-        /**
-         * Copies a byte into a bit set at a particular position.
-         *
-         * @param bitSet Bit set
-         * @param pos Position
-         * @param x Byte
-         */
-        protected static void copyFromByte(BitSet bitSet, int pos, byte x)
-        {
-            if (x == 0) {
-                return;
-            }
-            if ((x & 0x01) != 0) {
-                bitSet.set(pos, true);
-            }
-            ++pos;
-            if ((x & 0x02) != 0) {
-                bitSet.set(pos, true);
-            }
-            ++pos;
-            if ((x & 0x04) != 0) {
-                bitSet.set(pos, true);
-            }
-            ++pos;
-            if ((x & 0x08) != 0) {
-                bitSet.set(pos, true);
-            }
-            ++pos;
-            if ((x & 0x10) != 0) {
-                bitSet.set(pos, true);
-            }
-            ++pos;
-            if ((x & 0x20) != 0) {
-                bitSet.set(pos, true);
-            }
-            ++pos;
-            if ((x & 0x40) != 0) {
-                bitSet.set(pos, true);
-            }
-            ++pos;
-            if ((x & 0x80) != 0) {
-                bitSet.set(pos, true);
-            }
-        }
-
-        /**
-         * Copies a {@code long} value (interpreted as 64 bits) into a bit set.
-         *
-         * @param bitSet Bit set
-         * @param pos Position
-         * @param x Byte
-         */
-        protected static void copyFromLong(
-            final BitSet bitSet,
-            int pos,
-            long x)
-        {
-            while (x != 0) {
-                copyFromByte(bitSet, pos, (byte) (x & 0xff));
-                x >>>= 8;
-                pos += 8;
             }
         }
 
@@ -421,7 +392,7 @@ public interface BitKey
             }
             assert i1 == i2;
             for (; i1 >= 0; --i1) {
-                int c = compareUnsigned(a1[i1], a2[i1]);
+                int c = Long.compareUnsigned(a1[i1], a2[i1]);
                 if (c != 0) {
                     return c;
                 }
@@ -429,39 +400,15 @@ public interface BitKey
             return 0;
         }
 
-        /**
-         * Performs unsigned comparison on two {@code long} values.
-         *
-         * @param i1 First value
-         * @param i2 Second value
-         * @return -1 if i1 is less than i2,
-         * 1 if i1 is greater than i2,
-         * 0 if i1 equals i2
-         */
-        public static int compareUnsigned(long i1, long i2) {
-            // We want to do unsigned comparison.
-            // Signed comparison returns the correct result except
-            // if i1<0 & i2>=0
-            // or i1>=0 & i2<0
-            if (i1 == i2) {
-                return 0;
-            } else if ((i1 < 0) == (i2 < 0)) {
-                // Same signs, signed comparison gives the right result
-                return i1 < i2 ? -1 : 1;
-            } else {
-                // Different signs, use signed comparison and invert the result
-                return i1 < i2 ? 1 : -1;
-            }
-        }
     }
 
     /**
-     * Implementation of {@link BitKey} for bit counts less than 64.
+     * The one-long implementation: positions 0–63, the layout almost
+     * every real catalog fits (a star rarely has 64+ columns).
      */
     public class Small extends AbstractBitKey {
 
         private static final long serialVersionUID = -7891880560056571197L;
-        public static final String REMOVE = "remove";
         private long bits;
 
         /**
@@ -480,8 +427,59 @@ public interface BitKey
         }
 
         @Override
+        public BitKey freeze() {
+            return new Frozen(bits);
+        }
+
+        /** The immutable form of {@link Small}. */
+        private static class Frozen extends Small {
+            private static final long serialVersionUID = 1L;
+
+            private Frozen(long bits) {
+                super(bits);
+            }
+
+            @Override
+            public void set(int pos) {
+                throw new UnsupportedOperationException("frozen BitKey");
+            }
+
+            @Override
+            public void clear(int pos) {
+                throw new UnsupportedOperationException("frozen BitKey");
+            }
+
+            @Override
+            public void clear() {
+                throw new UnsupportedOperationException("frozen BitKey");
+            }
+
+            @Override
+            public BitKey freeze() {
+                return this;
+            }
+        }
+
+        /**
+         * The shared {@link BitKey#EMPTY} instance: a frozen empty key
+         * whose deserialization resolves back to the shared instance, so
+         * identity checks against EMPTY survive a round trip.
+         */
+        private static final class Empty extends Frozen {
+            private static final long serialVersionUID = 1L;
+
+            private Empty() {
+                super(0);
+            }
+
+            private Object readResolve() {
+                return BitKey.EMPTY;
+            }
+        }
+
+        @Override
 		public void set(int pos) {
-            if (pos < 64) {
+            if (pos >= 0 && pos < 64) {
                 bits |= bit(pos);
             } else {
                 throw new IllegalArgumentException(
@@ -491,12 +489,17 @@ public interface BitKey
 
         @Override
 		public boolean get(int pos) {
-            return pos < 64 && ((bits & bit(pos)) != 0);
+            return pos >= 0 && pos < 64 && ((bits & bit(pos)) != 0);
         }
 
         @Override
 		public void clear(int pos) {
-            bits &= ~bit(pos);
+            if (pos >= 0 && pos < 64) {
+                bits &= ~bit(pos);
+            } else {
+                throw new IllegalArgumentException(
+                    new StringBuilder("pos ").append(pos).append(" exceeds capacity 64").toString());
+            }
         }
 
         @Override
@@ -506,16 +509,13 @@ public interface BitKey
 
         @Override
 		public int cardinality() {
-            return bitCount(bits);
+            return Long.bitCount(bits);
         }
 
         private void or(long bits) {
             this.bits |= bits;
         }
 
-        private void orNot(long bits) {
-            this.bits ^= bits;
-        }
 
         private void and(long bits) {
             this.bits &= bits;
@@ -524,61 +524,41 @@ public interface BitKey
         @Override
 		public BitKey or(BitKey bitKey) {
             if (bitKey instanceof BitKey.Small other) {
-                final BitKey.Small bk = (BitKey.Small) copy();
-                bk.or(other.bits);
-                return bk;
+                final BitKey.Small result = (BitKey.Small) copy();
+                result.or(other.bits);
+                return result;
 
             } else if (bitKey instanceof BitKey.Mid128 other) {
-                final BitKey.Mid128 bk = (BitKey.Mid128) other.copy();
-                bk.or(this.bits, 0);
-                return bk;
+                final BitKey.Mid128 result = (BitKey.Mid128) other.copy();
+                result.or(this.bits, 0);
+                return result;
 
             } else if (bitKey instanceof BitKey.Big other) {
-                final BitKey.Big bk = (BitKey.Big) other.copy();
-                bk.or(this.bits);
-                return bk;
+                final BitKey.Big result = (BitKey.Big) other.copy();
+                result.or(this.bits);
+                return result;
             }
 
             throw createException(bitKey);
         }
 
-        @Override
-		public BitKey orNot(BitKey bitKey) {
-            if (bitKey instanceof BitKey.Small other) {
-                final BitKey.Small bk = (BitKey.Small) copy();
-                bk.orNot(other.bits);
-                return bk;
-
-            } else if (bitKey instanceof BitKey.Mid128 other) {
-                final BitKey.Mid128 bk = (BitKey.Mid128) other.copy();
-                bk.orNot(this.bits, 0);
-                return bk;
-
-            } else if (bitKey instanceof BitKey.Big other) {
-                final BitKey.Big bk = (BitKey.Big) other.copy();
-                bk.orNot(this.bits);
-                return bk;
-            }
-
-            throw createException(bitKey);
-        }
 
         @Override
 		public BitKey and(BitKey bitKey) {
             if (bitKey instanceof BitKey.Small other) {
-                final BitKey.Small bk = (BitKey.Small) copy();
-                bk.and(other.bits);
-                return bk;
+                final BitKey.Small result = (BitKey.Small) copy();
+                result.and(other.bits);
+                return result;
 
             } else if (bitKey instanceof BitKey.Mid128 other) {
-                final BitKey.Small bk = (BitKey.Small) copy();
-                bk.and(other.bits0);
-                return bk;
+                final BitKey.Small result = (BitKey.Small) copy();
+                result.and(other.bits0);
+                return result;
 
             } else if (bitKey instanceof BitKey.Big other) {
-                final BitKey.Small bk = (BitKey.Small) copy();
-                bk.and(other.bits[0]);
-                return bk;
+                final BitKey.Small result = (BitKey.Small) copy();
+                result.and(other.bits[0]);
+                return result;
             }
 
             throw createException(bitKey);
@@ -587,19 +567,19 @@ public interface BitKey
         @Override
 		public BitKey andNot(BitKey bitKey) {
             if (bitKey instanceof BitKey.Small other) {
-                final BitKey.Small bk = (BitKey.Small) copy();
-                bk.andNot(other.bits);
-                return bk;
+                final BitKey.Small result = (BitKey.Small) copy();
+                result.andNot(other.bits);
+                return result;
 
             } else if (bitKey instanceof BitKey.Mid128 other) {
-                final BitKey.Small bk = (BitKey.Small) copy();
-                bk.andNot(other.bits0);
-                return bk;
+                final BitKey.Small result = (BitKey.Small) copy();
+                result.andNot(other.bits0);
+                return result;
 
             } else if (bitKey instanceof BitKey.Big other) {
-                final BitKey.Small bk = (BitKey.Small) copy();
-                bk.andNot(other.bits[0]);
-                return bk;
+                final BitKey.Small result = (BitKey.Small) copy();
+                result.andNot(other.bits[0]);
+                return result;
             }
 
             throw createException(bitKey);
@@ -648,81 +628,10 @@ public interface BitKey
         }
 
         @Override
-		public BitSet toBitSet() {
-            final BitSet bitSet = new BitSet(64);
-            long x = bits;
-            int pos = 0;
-            while (x != 0) {
-                copyFromByte(bitSet, pos, (byte) (x & 0xff));
-                x >>>= 8;
-                pos += 8;
-            }
-            return bitSet;
+		public long[] toLongArray() {
+            return bits == 0 ? new long[0] : new long[] {bits};
         }
 
-        /**
-         * To say that I am happy about this algorithm (or the variations
-         * of the algorithm used for the Mid128 and Big BitKey implementations)
-         * would be a stretch. It works but there has to be a more
-         * elegant and faster one but this is the best I could come up
-         * with in a couple of hours.
-         *
-         */
-        @Override
-		public Iterator<Integer> iterator() {
-            return new Iterator<>() {
-                int pos = -1;
-                long bits = Small.this.bits;
-                @Override
-				public boolean hasNext() {
-                    if (bits == 0) {
-                        return false;
-                    }
-                    // This is a special case
-                    // Long.MIN_VALUE == -9223372036854775808
-                    if (bits == Long.MIN_VALUE) {
-                        pos = 63;
-                        bits = 0;
-                        return true;
-                    }
-                    long b = (bits & -bits);
-                    if (b == 0) {
-                        // should never happen
-                        return false;
-                    }
-                    int delta = 0;
-                    while (b >= 256) {
-                        b = (b >> 8);
-                        delta += 8;
-                    }
-                    int p = bitPositionTable[(int) b];
-                    if (p >= 0) {
-                        p += delta;
-                    } else {
-                        p = delta;
-                    }
-                    if (pos < 0) {
-                        // first time
-                        pos = p;
-                    } else if (p == 0) {
-                        pos++;
-                    } else {
-                        pos += (p + 1);
-                    }
-                    bits = bits >>> (p + 1);
-                    return true;
-                }
-                @Override
-                @SuppressWarnings("java:S2272")
-				public Integer next() {
-                    return Integer.valueOf(pos);
-                }
-                @Override
-				public void remove() {
-                    throw new UnsupportedOperationException(REMOVE);
-                }
-            };
-        }
 
         @Override
 		public int nextSetBit(int fromIndex) {
@@ -732,7 +641,7 @@ public interface BitKey
             }
 
             if (fromIndex < 64) {
-                long word = bits & (WORD_MASK << fromIndex);
+                long word = bits & (-1L << fromIndex);
                 if (word != 0) {
                     return Long.numberOfTrailingZeros(word);
                 }
@@ -768,34 +677,34 @@ public interface BitKey
 
         @Override
 		public int hashCode() {
-            return (int)(1234L ^ bits ^ (bits >>> 32));
+            // same shape as Mid128/Big: seed XOR chunks, then fold the
+            // ACCUMULATOR - folding the raw bits is value-identical only
+            // while the seed fits in 32 bits; this form survives a seed change
+            long h = 1234L ^ bits;
+            return (int) ((h >>> 32) ^ h);
         }
 
         @Override
 		public int compareTo(BitKey bitKey) {
-            if (bitKey instanceof Small that) {
-                if (this.bits == that.bits) {
-                    return  0;
-                } else {
-                    return this.bits < that.bits ? -1 : 1;
-                }
-            } else if (bitKey instanceof Mid128 that) {
-                if (that.bits1 != 0) {
+            if (bitKey instanceof Small other) {
+                return Long.compareUnsigned(this.bits, other.bits);
+            } else if (bitKey instanceof Mid128 other) {
+                if (other.bits1 != 0) {
                     return -1;
                 }
-                return compareUnsigned(this.bits, that.bits0);
+                return Long.compareUnsigned(this.bits, other.bits0);
             } else {
                 return compareToBig((Big) bitKey);
             }
         }
 
-        protected int compareToBig(Big that) {
-            int thatBitsLength = that.effectiveSize();
-            switch (thatBitsLength) {
+        private int compareToBig(Big other) {
+            int otherLength = other.effectiveSize();
+            switch (otherLength) {
             case 0:
                 return this.bits == 0 ? 0 : 1;
             case 1:
-                return compareUnsigned(this.bits, that.bits[0]);
+                return Long.compareUnsigned(this.bits, other.bits[0]);
             default:
                 return -1;
             }
@@ -828,7 +737,8 @@ public interface BitKey
     }
 
     /**
-     * Implementation of {@link BitKey} good for sizes less than 128.
+     * The two-long implementation: positions 0–127, two inline fields
+     * instead of an array.
      */
     public class Mid128 extends AbstractBitKey {
         private static final long serialVersionUID = -8409143207943258659L;
@@ -844,10 +754,44 @@ public interface BitKey
         }
 
         @Override
+        public BitKey freeze() {
+            return new Frozen(this);
+        }
+
+        /** The immutable form of {@link Mid128}. */
+        private static final class Frozen extends Mid128 {
+            private static final long serialVersionUID = 1L;
+
+            private Frozen(Mid128 source) {
+                super(source);
+            }
+
+            @Override
+            public void set(int pos) {
+                throw new UnsupportedOperationException("frozen BitKey");
+            }
+
+            @Override
+            public void clear(int pos) {
+                throw new UnsupportedOperationException("frozen BitKey");
+            }
+
+            @Override
+            public void clear() {
+                throw new UnsupportedOperationException("frozen BitKey");
+            }
+
+            @Override
+            public BitKey freeze() {
+                return this;
+            }
+        }
+
+        @Override
 		public void set(int pos) {
-            if (pos < 64) {
+            if (pos >= 0 && pos < 64) {
                 bits0 |= bit(pos);
-            } else if (pos < 128) {
+            } else if (pos >= 64 && pos < 128) {
                 bits1 |= bit(pos);
             } else {
                 throw new IllegalArgumentException(
@@ -857,9 +801,9 @@ public interface BitKey
 
         @Override
 		public boolean get(int pos) {
-            if (pos < 64) {
+            if (pos >= 0 && pos < 64) {
                 return (bits0 & bit(pos)) != 0;
-            } else if (pos < 128) {
+            } else if (pos >= 64 && pos < 128) {
                 return (bits1 & bit(pos)) != 0;
             } else {
                 return false;
@@ -868,13 +812,13 @@ public interface BitKey
 
         @Override
 		public void clear(int pos) {
-            if (pos < 64) {
+            if (pos >= 0 && pos < 64) {
                 bits0 &= ~bit(pos);
-            } else if (pos < 128) {
+            } else if (pos >= 64 && pos < 128) {
                 bits1 &= ~bit(pos);
             } else {
-                throw new IndexOutOfBoundsException(
-                    new StringBuilder("pos ").append(pos).append(" exceeds size ").append(128).toString());
+                throw new IllegalArgumentException(
+                    new StringBuilder("pos ").append(pos).append(" exceeds capacity 128").toString());
             }
         }
 
@@ -886,8 +830,8 @@ public interface BitKey
 
         @Override
 		public int cardinality() {
-            return bitCount(bits0)
-               + bitCount(bits1);
+            return Long.bitCount(bits0)
+               + Long.bitCount(bits1);
         }
 
         private void or(long bits0, long bits1) {
@@ -895,10 +839,6 @@ public interface BitKey
             this.bits1 |= bits1;
         }
 
-        private void orNot(long bits0, long bits1) {
-            this.bits0 ^= bits0;
-            this.bits1 ^= bits1;
-        }
 
         private void and(long bits0, long bits1) {
             this.bits0 &= bits0;
@@ -908,61 +848,41 @@ public interface BitKey
         @Override
 		public BitKey or(BitKey bitKey) {
             if (bitKey instanceof BitKey.Small other) {
-                final BitKey.Mid128 bk = (BitKey.Mid128) copy();
-                bk.or(other.bits, 0);
-                return bk;
+                final BitKey.Mid128 result = (BitKey.Mid128) copy();
+                result.or(other.bits, 0);
+                return result;
 
             } else if (bitKey instanceof BitKey.Mid128 other) {
-                final BitKey.Mid128 bk = (BitKey.Mid128) copy();
-                bk.or(other.bits0, other.bits1);
-                return bk;
+                final BitKey.Mid128 result = (BitKey.Mid128) copy();
+                result.or(other.bits0, other.bits1);
+                return result;
 
             } else if (bitKey instanceof BitKey.Big other) {
-                final BitKey.Big bk = (BitKey.Big) other.copy();
-                bk.or(this.bits0, this.bits1);
-                return bk;
+                final BitKey.Big result = (BitKey.Big) other.copy();
+                result.or(this.bits0, this.bits1);
+                return result;
             }
 
             throw createException(bitKey);
         }
 
-        @Override
-		public BitKey orNot(BitKey bitKey) {
-            if (bitKey instanceof BitKey.Small other) {
-                final BitKey.Mid128 bk = (BitKey.Mid128) copy();
-                bk.orNot(other.bits, 0);
-                return bk;
-
-            } else if (bitKey instanceof BitKey.Mid128 other) {
-                final BitKey.Mid128 bk = (BitKey.Mid128) copy();
-                bk.orNot(other.bits0, other.bits1);
-                return bk;
-
-            } else if (bitKey instanceof BitKey.Big other) {
-                final BitKey.Big bk = (BitKey.Big) other.copy();
-                bk.orNot(this.bits0, this.bits1);
-                return bk;
-            }
-
-            throw createException(bitKey);
-        }
 
         @Override
 		public BitKey and(BitKey bitKey) {
             if (bitKey instanceof BitKey.Small other) {
-                final BitKey.Mid128 bk = (BitKey.Mid128) copy();
-                bk.and(other.bits, 0);
-                return bk;
+                final BitKey.Mid128 result = (BitKey.Mid128) copy();
+                result.and(other.bits, 0);
+                return result;
 
             } else if (bitKey instanceof BitKey.Mid128 other) {
-                final BitKey.Mid128 bk = (BitKey.Mid128) copy();
-                bk.and(other.bits0, other.bits1);
-                return bk;
+                final BitKey.Mid128 result = (BitKey.Mid128) copy();
+                result.and(other.bits0, other.bits1);
+                return result;
 
             } else if (bitKey instanceof BitKey.Big other) {
-                final BitKey.Mid128 bk = (BitKey.Mid128) copy();
-                bk.and(other.bits[0], other.bits[1]);
-                return bk;
+                final BitKey.Mid128 result = (BitKey.Mid128) copy();
+                result.and(other.bits[0], other.bits[1]);
+                return result;
             }
 
             throw createException(bitKey);
@@ -971,19 +891,19 @@ public interface BitKey
         @Override
 		public BitKey andNot(BitKey bitKey) {
             if (bitKey instanceof BitKey.Small other) {
-                final BitKey.Mid128 bk = (BitKey.Mid128) copy();
-                bk.andNot(other.bits, 0);
-                return bk;
+                final BitKey.Mid128 result = (BitKey.Mid128) copy();
+                result.andNot(other.bits, 0);
+                return result;
 
             } else if (bitKey instanceof BitKey.Mid128 other) {
-                final BitKey.Mid128 bk = (BitKey.Mid128) copy();
-                bk.andNot(other.bits0, other.bits1);
-                return bk;
+                final BitKey.Mid128 result = (BitKey.Mid128) copy();
+                result.andNot(other.bits0, other.bits1);
+                return result;
 
             } else if (bitKey instanceof BitKey.Big other) {
-                final BitKey.Mid128 bk = (BitKey.Mid128) copy();
-                bk.andNot(other.bits[0], other.bits[1]);
-                return bk;
+                final BitKey.Mid128 result = (BitKey.Mid128) copy();
+                result.andNot(other.bits[0], other.bits[1]);
+                return result;
             }
 
             throw createException(bitKey);
@@ -1040,92 +960,11 @@ public interface BitKey
         }
 
         @Override
-		public BitSet toBitSet() {
-            final BitSet bitSet = new BitSet(128);
-            copyFromLong(bitSet, 0, bits0);
-            copyFromLong(bitSet, 64, bits1);
-            return bitSet;
-        }
-        @Override
-		public Iterator<Integer> iterator() {
-            return new Iterator<>() {
-                long bits0 = Mid128.this.bits0;
-                long bits1 = Mid128.this.bits1;
-                int pos = -1;
-                @Override
-				public boolean hasNext() {
-                    if (bits0 != 0) {
-                        if (bits0 == Long.MIN_VALUE) {
-                            pos = 63;
-                            bits0 = 0;
-                            return true;
-                        }
-                        long b = (bits0&-bits0);
-                        int delta = 0;
-                        while (b >= 256) {
-                            b = (b >> 8);
-                            delta += 8;
-                        }
-                        int p = bitPositionTable[(int) b];
-                        if (p >= 0) {
-                            p += delta;
-                        } else {
-                            p = delta;
-                        }
-                        if (pos < 0) {
-                            pos = p;
-                        } else if (p == 0) {
-                            pos++;
-                        } else {
-                            pos += (p + 1);
-                        }
-                        bits0 = bits0 >>> (p + 1);
-                        return true;
-                    } else {
-                        if (pos < 63) {
-                            pos = 63;
-                        }
-                        if (bits1 == Long.MIN_VALUE) {
-                            pos = 127;
-                            bits1 = 0;
-                            return true;
-                        }
-                        long b = (bits1&-bits1);
-                        if (b == 0) {
-                            return false;
-                        }
-                        int delta = 0;
-                        while (b >= 256) {
-                            b = (b >> 8);
-                            delta += 8;
-                        }
-                        int p = bitPositionTable[(int) b];
-                        if (p >= 0) {
-                            p += delta;
-                        } else {
-                            p = delta;
-                        }
-                        if (pos < 0) {
-                            pos = p;
-                        } else if (p == 63) {
-                            pos++;
-                        } else {
-                            pos += (p + 1);
-                        }
-                        bits1 = bits1 >>> (p + 1);
-                        return true;
-                    }
-                }
-                @Override
-                @SuppressWarnings("java:S2272")
-				public Integer next() {
-                    return Integer.valueOf(pos);
-                }
-                @Override
-				public void remove() {
-                    throw new UnsupportedOperationException(Small.REMOVE);
-                }
-            };
+		public long[] toLongArray() {
+            if (bits1 != 0) {
+                return new long[] {bits0, bits1};
+            }
+            return bits0 == 0 ? new long[0] : new long[] {bits0};
         }
 
         @Override
@@ -1139,7 +978,7 @@ public interface BitKey
             long word;
             switch (u) {
             case 0:
-                word = bits0 & (WORD_MASK << fromIndex);
+                word = bits0 & (-1L << fromIndex);
                 if (word != 0) {
                     return Long.numberOfTrailingZeros(word);
                 }
@@ -1149,7 +988,7 @@ public interface BitKey
                 }
                 return -1;
             case 1:
-                word = bits1 & (WORD_MASK << fromIndex);
+                word = bits1 & (-1L << fromIndex);
                 if (word != 0) {
                     return 64 + Long.numberOfTrailingZeros(word);
                 }
@@ -1225,24 +1064,24 @@ public interface BitKey
         // implement Comparable (in lazy, expensive fashion)
         @Override
 		public int compareTo(BitKey bitKey) {
-            if (bitKey instanceof Mid128 that) {
-                if (this.bits1 != that.bits1) {
-                    return compareUnsigned(this.bits1, that.bits1);
+            if (bitKey instanceof Mid128 other) {
+                if (this.bits1 != other.bits1) {
+                    return Long.compareUnsigned(this.bits1, other.bits1);
                 }
-                return compareUnsigned(this.bits0, that.bits0);
-            } else if (bitKey instanceof Small that) {
+                return Long.compareUnsigned(this.bits0, other.bits0);
+            } else if (bitKey instanceof Small other) {
                 if (this.bits1 != 0) {
                     return 1;
                 }
-                return compareUnsigned(this.bits0, that.bits);
+                return Long.compareUnsigned(this.bits0, other.bits);
             } else {
                 return compareToBig((Big) bitKey);
             }
         }
 
-        int compareToBig(Big that) {
-            int thatBitsLength = that.effectiveSize();
-            switch (thatBitsLength) {
+        private int compareToBig(Big other) {
+            int otherLength = other.effectiveSize();
+            switch (otherLength) {
             case 0:
                 return this.bits1 == 0
                     && this.bits0 == 0
@@ -1252,12 +1091,12 @@ public interface BitKey
                 if (this.bits1 != 0) {
                     return 1;
                 }
-                return compareUnsigned(this.bits0, that.bits[0]);
+                return Long.compareUnsigned(this.bits0, other.bits[0]);
             case 2:
-                if (this.bits1 != that.bits[1]) {
-                    return compareUnsigned(this.bits1, that.bits[1]);
+                if (this.bits1 != other.bits[1]) {
+                    return Long.compareUnsigned(this.bits1, other.bits[1]);
                 }
-                return compareUnsigned(this.bits0, that.bits[0]);
+                return Long.compareUnsigned(this.bits0, other.bits[0]);
             default:
                 return -1;
             }
@@ -1265,12 +1104,15 @@ public interface BitKey
     }
 
     /**
-     * Implementation of {@link BitKey} with more than 64 bits. Similar to
-     * {@link java.util.BitSet}, but does not require dynamic resizing.
+     * The wide implementation: an array of 64-bit chunks, fixed at
+     * construction (no dynamic resizing), with a lazily cached hash that
+     * every mutator resets.
      */
     public class Big extends AbstractBitKey {
         private static final long serialVersionUID = -3715282769845236295L;
         private long[] bits;
+        /** Cached hash; 0 = not computed. Mutators reset it. */
+        private transient int hash;
 
         private Big(int size) {
             bits = new long[chunkCount(size + 1)];
@@ -1278,6 +1120,42 @@ public interface BitKey
 
         private Big(Big big) {
             bits = big.bits.clone();
+        }
+
+        @Override
+        public BitKey freeze() {
+            return new Frozen(this);
+        }
+
+        /** The immutable form of {@link Big}: the hash is computed eagerly. */
+        private static final class Frozen extends Big {
+            private static final long serialVersionUID = 1L;
+
+            private Frozen(Big source) {
+                super(source);
+                // published keys pay the wide hash once, here
+                hashCode();
+            }
+
+            @Override
+            public void set(int pos) {
+                throw new UnsupportedOperationException("frozen BitKey");
+            }
+
+            @Override
+            public void clear(int pos) {
+                throw new UnsupportedOperationException("frozen BitKey");
+            }
+
+            @Override
+            public void clear() {
+                throw new UnsupportedOperationException("frozen BitKey");
+            }
+
+            @Override
+            public BitKey freeze() {
+                return this;
+            }
         }
 
         private int size() {
@@ -1300,17 +1178,30 @@ public interface BitKey
 
         @Override
 		public void set(int pos) {
+            if (pos < 0 || chunkPos(pos) >= bits.length) {
+                throw new IllegalArgumentException(
+                    new StringBuilder("pos ").append(pos).append(" exceeds capacity ")
+                        .append(bits.length << CHUNK_SHIFT).toString());
+            }
             bits[chunkPos(pos)] |= bit(pos);
+            hash = 0;
         }
 
         @Override
 		public boolean get(int pos) {
-            return (bits[chunkPos(pos)] & bit(pos)) != 0;
+            return pos >= 0 && chunkPos(pos) < bits.length
+                && (bits[chunkPos(pos)] & bit(pos)) != 0;
         }
 
         @Override
 		public void clear(int pos) {
+            if (pos < 0 || chunkPos(pos) >= bits.length) {
+                throw new IllegalArgumentException(
+                    new StringBuilder("pos ").append(pos).append(" exceeds capacity ")
+                        .append(bits.length << CHUNK_SHIFT).toString());
+            }
             bits[chunkPos(pos)] &= ~bit(pos);
+            hash = 0;
         }
 
         @Override
@@ -1318,48 +1209,51 @@ public interface BitKey
             for (int i = 0; i < bits.length; i++) {
                 bits[i] = 0;
             }
+            hash = 0;
         }
 
         @Override
 		public int cardinality() {
             int n = 0;
             for (int i = 0; i < bits.length; i++) {
-                n += bitCount(bits[i]);
+                n += Long.bitCount(bits[i]);
             }
             return n;
         }
 
         private void or(long bits0) {
             this.bits[0] |= bits0;
+            hash = 0;
         }
 
         private void or(long bits0, long bits1) {
             this.bits[0] |= bits0;
             this.bits[1] |= bits1;
+            hash = 0;
         }
 
         private void or(long[] bits) {
-            for (int i = 0; i < bits.length; i++) {
+            // every caller picks the larger side as the receiver first (a Big
+            // always has >= 2 chunks - the Factory only builds it for
+            // size >= 128). The clamp keeps a future caller's mistake from
+            // becoming an AIOOBE; the assert keeps it from silently DROPPING
+            // bits, which for or() would be worse than the crash
+            assert bits.length <= this.bits.length : "or() argument wider than receiver";
+            int length = Math.min(bits.length, this.bits.length);
+            for (int i = 0; i < length; i++) {
                 this.bits[i] |= bits[i];
             }
+            hash = 0;
         }
 
-        private void orNot(long bits0) {
-            this.bits[0] ^= bits0;
-        }
 
-        private void orNot(long bits0, long bits1) {
-            this.bits[0] ^= bits0;
-            this.bits[1] ^= bits1;
-        }
 
-        private void orNot(long[] bits) {
-            for (int i = 0; i < bits.length; i++) {
-                this.bits[i] ^= bits[i];
-            }
-        }
 
         private void and(long[] bits) {
+            // same shape as or()'s guard: the Big/Big paths pick the SMALLER
+            // side as the receiver, so the argument is never shorter - the
+            // min-clamp plus the tail-zeroing keeps a future caller's
+            // mistake correct (missing high chunks count as zero for and)
             int length = Math.min(bits.length, this.bits.length);
             for (int i = 0; i < length; i++) {
                 this.bits[i] &= bits[i];
@@ -1367,83 +1261,58 @@ public interface BitKey
             for (int i = bits.length; i < this.bits.length; i++) {
                 this.bits[i] = 0;
             }
+            hash = 0;
         }
 
         @Override
 		public BitKey or(BitKey bitKey) {
             if (bitKey instanceof BitKey.Small other) {
-                final BitKey.Big bk = (BitKey.Big) copy();
-                bk.or(other.bits);
-                return bk;
+                final BitKey.Big result = (BitKey.Big) copy();
+                result.or(other.bits);
+                return result;
 
             } else if (bitKey instanceof BitKey.Mid128 other) {
-                final BitKey.Big bk = (BitKey.Big) copy();
-                bk.or(other.bits0, other.bits1);
-                return bk;
+                final BitKey.Big result = (BitKey.Big) copy();
+                result.or(other.bits0, other.bits1);
+                return result;
 
             } else if (bitKey instanceof BitKey.Big other) {
                 if (other.size() > size()) {
-                    final BitKey.Big bk = (BitKey.Big) other.copy();
-                    bk.or(bits);
-                    return bk;
+                    final BitKey.Big result = (BitKey.Big) other.copy();
+                    result.or(bits);
+                    return result;
                 } else {
-                    final BitKey.Big bk = (BitKey.Big) copy();
-                    bk.or(other.bits);
-                    return bk;
+                    final BitKey.Big result = (BitKey.Big) copy();
+                    result.or(other.bits);
+                    return result;
                 }
             }
 
             throw createException(bitKey);
         }
 
-        @Override
-		public BitKey orNot(BitKey bitKey) {
-            if (bitKey instanceof BitKey.Small other) {
-                final BitKey.Big bk = (BitKey.Big) copy();
-                bk.orNot(other.bits);
-                return bk;
-
-            } else if (bitKey instanceof BitKey.Mid128 other) {
-                final BitKey.Big bk = (BitKey.Big) copy();
-                bk.orNot(other.bits0, other.bits1);
-                return bk;
-
-            } else if (bitKey instanceof BitKey.Big other) {
-                if (other.size() > size()) {
-                    final BitKey.Big bk = (BitKey.Big) other.copy();
-                    bk.orNot(bits);
-                    return bk;
-                } else {
-                    final BitKey.Big bk = (BitKey.Big) copy();
-                    bk.orNot(other.bits);
-                    return bk;
-                }
-            }
-
-            throw createException(bitKey);
-        }
 
         @Override
 		public BitKey and(BitKey bitKey) {
             if (bitKey instanceof BitKey.Small) {
-                final BitKey.Small bk = (BitKey.Small) bitKey.copy();
-                bk.and(bits[0]);
-                return bk;
+                final BitKey.Small result = (BitKey.Small) bitKey.copy();
+                result.and(bits[0]);
+                return result;
 
             } else if (bitKey instanceof BitKey.Mid128) {
-                final BitKey.Mid128 bk = (BitKey.Mid128) bitKey.copy();
-                bk.and(bits[0], bits[1]);
-                return bk;
+                final BitKey.Mid128 result = (BitKey.Mid128) bitKey.copy();
+                result.and(bits[0], bits[1]);
+                return result;
 
             } else if (bitKey instanceof BitKey.Big other) {
                 if (other.size() < size()) {
-                    final BitKey.Big bk = (BitKey.Big) other.copy();
-                    bk.and(bits);
-                    return bk;
+                    final BitKey.Big result = (BitKey.Big) other.copy();
+                    result.and(bits);
+                    return result;
                 } else {
-                    final BitKey.Big bk = (BitKey.Big) copy();
-                    bk.and(other.bits);
-                    return bk;
+                    final BitKey.Big result = (BitKey.Big) copy();
+                    result.and(other.bits);
+                    return result;
                 }
             }
 
@@ -1453,37 +1322,43 @@ public interface BitKey
         @Override
 		public BitKey andNot(BitKey bitKey) {
             if (bitKey instanceof BitKey.Small other) {
-                final BitKey.Big bk = (BitKey.Big) copy();
-                bk.andNot(other.bits);
-                return bk;
+                final BitKey.Big result = (BitKey.Big) copy();
+                result.andNot(other.bits);
+                return result;
 
             } else if (bitKey instanceof BitKey.Mid128 other) {
-                final BitKey.Big bk = (BitKey.Big) copy();
-                bk.andNot(other.bits0, other.bits1);
-                return bk;
+                final BitKey.Big result = (BitKey.Big) copy();
+                result.andNot(other.bits0, other.bits1);
+                return result;
 
             } else if (bitKey instanceof BitKey.Big other) {
-                final BitKey.Big bk = (BitKey.Big) copy();
-                bk.andNot(other.bits);
-                return bk;
+                final BitKey.Big result = (BitKey.Big) copy();
+                result.andNot(other.bits);
+                return result;
             }
 
             throw createException(bitKey);
         }
 
         private void andNot(long[] bits) {
-            for (int i = 0; i < bits.length; i++) {
+            // bits beyond either capacity are zero; clamping keeps a longer
+            // operand from running past this array (and() clamps the same way)
+            final int length = Math.min(bits.length, this.bits.length);
+            for (int i = 0; i < length; i++) {
                 this.bits[i] &= ~bits[i];
             }
+            hash = 0;
         }
 
         private void andNot(long bits0, long bits1) {
             this.bits[0] &= ~bits0;
             this.bits[1] &= ~bits1;
+            hash = 0;
         }
 
         private void andNot(long bits) {
             this.bits[0] &= ~bits;
+            hash = 0;
         }
 
         @Override
@@ -1536,90 +1411,10 @@ public interface BitKey
         }
 
         @Override
-		public BitSet toBitSet() {
-            final BitSet bitSet = new BitSet(64);
-            int pos = 0;
-            for (int i = 0; i < bits.length; i++) {
-                copyFromLong(bitSet, pos, bits[i]);
-                pos += 64;
-            }
-            return bitSet;
+		public long[] toLongArray() {
+            return java.util.Arrays.copyOf(bits, effectiveSize());
         }
 
-        @Override
-		public Iterator<Integer> iterator() {
-            return new Iterator<>() {
-                long[] bits = Big.this.bits.clone();
-                int pos = -1;
-                int index = 0;
-                @Override
-				public boolean hasNext() {
-                    if (index >= bits.length) {
-                        return false;
-                    }
-                    if (pos < 0) {
-                        while (bits[index] == 0) {
-                            index++;
-                            if (index >= bits.length) {
-                                return false;
-                            }
-                        }
-                        pos = (64 * index) - 1;
-                    }
-                    long bs = bits[index];
-                    if (bs == 0) {
-                        while (bits[index] == 0) {
-                            index++;
-                            if (index >= bits.length) {
-                                return false;
-                            }
-                        }
-                        pos = (64 * index) - 1;
-                        bs = bits[index];
-                    }
-                    if (bs != 0) {
-                        if (bs == Long.MIN_VALUE) {
-                            pos = (64 * index) + 63;
-                            bits[index] = 0;
-                            return true;
-                        }
-                        long b = (bs&-bs);
-                        int delta = 0;
-                        while (b >= 256) {
-                            b = (b >> 8);
-                            delta += 8;
-                        }
-                        int p = bitPositionTable[(int) b];
-                        if (p >= 0) {
-                            p += delta;
-                        } else {
-                            p = delta;
-                        }
-                        if (pos < 0) {
-                            pos = p;
-                        } else if (p == 0) {
-                            pos++;
-                        } else {
-                            pos += (p + 1);
-                        }
-                        bits[index] = bits[index] >>> (p + 1);
-                        return true;
-                    }
-                    return false;
-                }
-
-                @Override
-                @SuppressWarnings("java:S2272")
-				public Integer next() {
-                    return Integer.valueOf(pos);
-                }
-
-                @Override
-				public void remove() {
-                    throw new UnsupportedOperationException(Small.REMOVE);
-                }
-            };
-        }
 
         @Override
 		public int nextSetBit(int fromIndex) {
@@ -1632,7 +1427,7 @@ public interface BitKey
             if (u >= bits.length) {
                 return -1;
             }
-            long word = bits[u] & (WORD_MASK << fromIndex);
+            long word = bits[u] & (-1L << fromIndex);
 
             while (true) {
                 if (word != 0) {
@@ -1708,12 +1503,19 @@ public interface BitKey
             // {1, 0, 0}. This algorithm in fact ignores all 0s.
             //
             // It is also important that the hash code is the same as produced
-            // by Small and Mid128.
+            // by Small and Mid128. Cached: wide keys are hot map keys, and a
+            // published key is not mutated (see the interface contract).
+            int cached = hash;
+            if (cached != 0) {
+                return cached;
+            }
             long h = 1234;
             for (int i = bits.length; --i >= 0;) {
                 h ^= bits[i] * (i + 1);
             }
-            return (int)((h >> 32) ^ h);
+            cached = (int)((h >> 32) ^ h);
+            hash = cached;
+            return cached;
         }
 
         @Override
@@ -1734,7 +1536,9 @@ public interface BitKey
 
         @Override
 		public BitKey emptyCopy() {
-            return new Big(bits.length << CHUNK_BIT_COUNT);
+            final Big result = new Big(this);
+            result.clear();
+            return result;
         }
 
         @Override
@@ -1751,31 +1555,12 @@ public interface BitKey
 		public int compareTo(BitKey bitKey) {
             if (bitKey instanceof Big big) {
                 return compareUnsignedArrays(this.bits, big.bits);
-            } else if (bitKey instanceof Mid128 that) {
-                return -that.compareToBig(this);
+            } else if (bitKey instanceof Mid128 other) {
+                return -other.compareToBig(this);
             } else {
-                Small that = (Small) bitKey;
-                return -that.compareToBig(this);
+                Small other = (Small) bitKey;
+                return -other.compareToBig(this);
             }
         }
     }
-
-    static final byte[] bitPositionTable = {
-       -1, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0,
-        4, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0,
-        5, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0,
-        4, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0,
-        6, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0,
-        4, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0,
-        5, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0,
-        4, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0,
-        7, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0,
-        4, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0,
-        5, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0,
-        4, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0,
-        6, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0,
-        4, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0,
-        5, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0,
-        4, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0
-    };
 }

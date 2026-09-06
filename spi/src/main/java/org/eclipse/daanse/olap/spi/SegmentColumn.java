@@ -41,7 +41,8 @@ import  org.eclipse.daanse.olap.util.ArraySortedSet;
  * <p>They are immutable and serializable.
  */
 public class SegmentColumn implements Serializable {
-    private static final long serialVersionUID = -5227838916517784720L;
+    // wire-format generation 2
+    private static final long serialVersionUID = 2L;
     public final String columnExpression;
     public final long valueCount;
     public final SortedSet<Comparable> values;
@@ -57,7 +58,7 @@ public class SegmentColumn implements Serializable {
      * @param valueCount Number of distinct values of this column in the
      *     database. For these purposes, null is counted as a value. If there
      *     are N distinct values of the column, and we have a collection of
-     *     segments that cover N values, then Mondrian assumes that it is safe
+     *     segments that cover N values, then The engine assumes that it is safe
      *     to roll up.
      *
      * @param valueList List of values to constrain the
@@ -82,28 +83,6 @@ public class SegmentColumn implements Serializable {
             this.values);
     }
 
-    /**
-     * Merges this column with another
-     * resulting in another whose values are super set of both.
-     */
-    public SegmentColumn merge(SegmentColumn col) {
-        assert col != null;
-        assert col.columnExpression.equals(this.columnExpression);
-
-        // If any values are wildcard, the merged result is a wildcard.
-        if (this.values == null || col.values == null) {
-            return new SegmentColumn(
-                columnExpression,
-                valueCount,
-                null);
-        }
-
-        return new SegmentColumn(
-            columnExpression,
-            valueCount,
-            ((ArraySortedSet) this.values).merge(
-                (ArraySortedSet) col.values));
-    }
 
     /**
      * Returns the column expression of this constrained column.
@@ -126,9 +105,7 @@ public class SegmentColumn implements Serializable {
         if (!(obj instanceof SegmentColumn that)) {
             return false;
         }
-        if (this.values == null && that.values == null) {
-            return true;
-        }
+        // two wildcard columns are only equal over the same column expression
         return this.columnExpression.equals(that.columnExpression)
             && Objects.equals(this.values, that.values);
     }
@@ -142,7 +119,7 @@ public class SegmentColumn implements Serializable {
      * Returns the number of distinct values that occur for this column in the
      * database.
      *
-     * <p>Mondrian uses this to know that it can safely combine multiple
+     * <p>The engine uses this to know that it can safely combine multiple
      * segments to roll up. For example, if for the "quarter" column, one
      * segment has values {"Q1", "Q2"} and another has values {"Q3", "Q4"},
      * and Mondrian knows that there are 4 values, then it can roll up.
