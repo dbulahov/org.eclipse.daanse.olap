@@ -513,7 +513,6 @@ public final class StandardFunctions {
         svc.addResolver(new AcoshResolver());
         svc.addResolver(new AcosResolver());
         svc.addResolver(new AsinhResolver());
-        svc.addResolver(new CoshResolver());
         svc.addResolver(new Atan2Resolver());
         svc.addResolver(new AtanhResolver());
         svc.addResolver(new CoshResolver());

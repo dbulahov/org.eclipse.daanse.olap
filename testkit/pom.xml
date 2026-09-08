@@ -29,5 +29,7 @@
 
   <modules>
     <module>core</module>
+    <module>assert</module>
+    <module>function</module>
   </modules>
 </project>
