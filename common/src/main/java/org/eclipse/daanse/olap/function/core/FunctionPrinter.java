@@ -211,29 +211,29 @@ public class FunctionPrinter {
 
 		switch (operationAtom) {
 		case PlainPropertyOperationAtom a: {
-			return new StringBuilder(getTypeDescription(parameterDataTypes[0])).append(".").append(name).toString();
+			return new StringBuilder(getTypeDescription(parameterDataTypes, 0)).append(".").append(name).toString();
 		}
 
 		case MethodOperationAtom a: {
 
 			return new StringBuilder(returnType == DataType.UNKNOWN ? ""
 					: new StringBuilder(getTypeDescription(returnType)).append(" ").toString())
-					.append(getTypeDescription(parameterDataTypes[0])).append(".").append(name).append("(")
+					.append(getTypeDescription(parameterDataTypes, 0)).append(".").append(name).append("(")
 					.append(getTypeDescriptionCommaList(parameterDataTypes, 1)).append(")").toString();
 		}
 		case InfixOperationAtom a: {
-			return new StringBuilder(getTypeDescription(parameterDataTypes[0])).append(" ").append(name).append(" ")
-					.append(getTypeDescription(parameterDataTypes[1])).toString();
+			return new StringBuilder(getTypeDescription(parameterDataTypes, 0)).append(" ").append(name).append(" ")
+					.append(getTypeDescription(parameterDataTypes, 1)).toString();
 
 		}
 
 		case PrefixOperationAtom a: {
-			return new StringBuilder(name).append(" ").append(getTypeDescription(parameterDataTypes[0])).toString();
+			return new StringBuilder(name).append(" ").append(getTypeDescription(parameterDataTypes, 0)).toString();
 
 		}
 
 		case PostfixOperationAtom a: {
-			return new StringBuilder(getTypeDescription(parameterDataTypes[0])).append(" ").append(name).toString();
+			return new StringBuilder(getTypeDescription(parameterDataTypes, 0)).append(" ").append(name).toString();
 
 		}
 
@@ -250,8 +250,8 @@ public class FunctionPrinter {
 		}
 
 		case CaseOperationAtom a: {
-			String s = getTypeDescription(parameterDataTypes[0]);
-			if (parameterDataTypes[0] == DataType.LOGICAL) {
+			String s = getTypeDescription(parameterDataTypes, 0);
+			if (parameterDataTypes.length > 0 && parameterDataTypes[0] == DataType.LOGICAL) {
 				return new StringBuilder("CASE WHEN ").append(s).append(" THEN <Expression> ... END").toString();
 			} else {
 				return new StringBuilder("CASE ").append(s).append(" WHEN ").append(s)
@@ -278,6 +278,17 @@ public class FunctionPrinter {
 
 	private static String getTypeDescription(DataType type) {
 		return new StringBuilder("<").append(type.getPrettyName()).append(">").toString();
+	}
+
+	/**
+	 * Renders the type at {@code index}, or {@code "<?>"} when {@code types} is shorter than
+	 * the atom's own shape expects. getSignature is also used to render diagnostic text for
+	 * probed calls whose argument count does not match the atom (for example a signature
+	 * probe trying a property atom with zero arguments): it must describe such a call rather
+	 * than throw.
+	 */
+	private static String getTypeDescription(DataType[] types, int index) {
+		return index < types.length ? getTypeDescription(types[index]) : "<?>";
 	}
 
 	private static String getTypeDescriptionCommaList(DataType[] types, int start) {

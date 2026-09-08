@@ -21,6 +21,6 @@ import org.osgi.service.component.annotations.Component;
 public class ChrWResolver extends ParametersCheckingFunctionDefinitionResolver {
 
     public ChrWResolver() {
-        super(new ChrBFunDef());
+        super(new ChrWFunDef());
     }
 }

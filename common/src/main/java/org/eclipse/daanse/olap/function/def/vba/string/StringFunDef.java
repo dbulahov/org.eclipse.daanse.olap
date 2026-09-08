@@ -27,7 +27,7 @@ import org.eclipse.daanse.olap.function.def.AbstractFunctionDefinition;
 public class StringFunDef  extends AbstractFunctionDefinition {
 
     static FunctionOperationAtom atom = new FunctionOperationAtom("String");
-    static String description = "";
+    static String description = "Returns a String containing a repeating string of characters of a given length.";
     static FunctionMetaData functionMetaData = new FunctionMetaDataR(atom, description,
             DataType.STRING, new FunctionParameterR[] { FunctionParameterR.param(DataType.INTEGER, "Number"), FunctionParameterR.param(DataType.STRING, "Character") });
 

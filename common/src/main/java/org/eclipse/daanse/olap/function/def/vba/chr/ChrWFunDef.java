@@ -26,7 +26,7 @@ import org.eclipse.daanse.olap.function.def.AbstractFunctionDefinition;
 
 public class ChrWFunDef  extends AbstractFunctionDefinition {
 
-    static FunctionOperationAtom atom = new FunctionOperationAtom("ChrB");
+    static FunctionOperationAtom atom = new FunctionOperationAtom("ChrW");
     static String description = """
         Returns an Integer representing the character code corresponding to
         the first letter in a string.""";
