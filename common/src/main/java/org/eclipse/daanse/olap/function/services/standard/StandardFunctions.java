@@ -73,6 +73,12 @@ import org.eclipse.daanse.olap.function.def.hierarchy.level.LevelHierarchyResolv
 import org.eclipse.daanse.olap.function.def.hierarchy.member.HierarchyCurrentMemberResolver;
 import org.eclipse.daanse.olap.function.def.hierarchy.member.MemberHierarchyResolver;
 import org.eclipse.daanse.olap.function.def.hierarchy.member.NamedSetCurrentResolver;
+import org.eclipse.daanse.olap.function.def.kpi.KPICurrentTimeMemberResolver;
+import org.eclipse.daanse.olap.function.def.kpi.KPIGoalResolver;
+import org.eclipse.daanse.olap.function.def.kpi.KPIStatusResolver;
+import org.eclipse.daanse.olap.function.def.kpi.KPITrendResolver;
+import org.eclipse.daanse.olap.function.def.kpi.KPIValueResolver;
+import org.eclipse.daanse.olap.function.def.kpi.KPIWeightResolver;
 import org.eclipse.daanse.olap.function.def.lastperiods.LastPeriodsResolver;
 import org.eclipse.daanse.olap.function.def.leadlag.LagResolver;
 import org.eclipse.daanse.olap.function.def.leadlag.LeadResolver;
@@ -271,6 +277,7 @@ import org.eclipse.daanse.olap.function.def.vba.sin.SinResolver;
 import org.eclipse.daanse.olap.function.def.vba.sln.SLNResolver;
 import org.eclipse.daanse.olap.function.def.vba.space.SpaceResolver;
 import org.eclipse.daanse.olap.function.def.vba.sqr.SqrResolver;
+import org.eclipse.daanse.olap.function.def.vba.str.StrResolver;
 import org.eclipse.daanse.olap.function.def.vba.strcomp.StrCompResolver;
 import org.eclipse.daanse.olap.function.def.vba.string.StringResolver;
 import org.eclipse.daanse.olap.function.def.vba.strreverse.StrReverseResolver;
@@ -472,6 +479,12 @@ public final class StandardFunctions {
         svc.addResolver(new HeadResolver());
         svc.addResolver(new TailResolver());
         svc.addResolver(new HierarchizeResolver());
+        svc.addResolver(new KPICurrentTimeMemberResolver());
+        svc.addResolver(new KPIGoalResolver());
+        svc.addResolver(new KPIStatusResolver());
+        svc.addResolver(new KPITrendResolver());
+        svc.addResolver(new KPIValueResolver());
+        svc.addResolver(new KPIWeightResolver());
         svc.addResolver(new LastPeriodsResolver());
         svc.addResolver(new DrilldownLevelBottomResolver());
 
@@ -606,6 +619,7 @@ public final class StandardFunctions {
 
         svc.addResolver(new org.eclipse.daanse.olap.function.def.vba.right.RightResolver());
         svc.addResolver(new SpaceResolver());
+        svc.addResolver(new StrResolver());
         svc.addResolver(new StrCompResolver());
         svc.addResolver(new StrReverseResolver());
         svc.addResolver(new StringResolver());

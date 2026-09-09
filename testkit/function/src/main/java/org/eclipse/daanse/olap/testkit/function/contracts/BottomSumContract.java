@@ -41,9 +41,16 @@ public final class BottomSumContract {
             .autoEdgeCases()
             .edgeCaseMdx("empty set",              "BottomSum({}, 50, [Measures].[Unit Sales])")
             .edgeCaseMdx("target zero",             "BottomSum([Gender].Members, 0, [Measures].[Unit Sales])")
+            .edgeCaseMdx("target -1",               "BottomSum([Gender].Members, -1, [Measures].[Unit Sales])")
             .edgeCaseMdx("target negative",         "BottomSum([Gender].Members, -10, [Measures].[Unit Sales])")
+            .edgeCaseMdx("target fractional",       "BottomSum([Gender].Members, 0.5, [Measures].[Unit Sales])")
             .edgeCaseMdx("target beyond total",     "BottomSum([Gender].Members, 1000000, [Measures].[Unit Sales])")
+            .edgeCaseMdx("target 1E308",            "BottomSum([Gender].Members, 1E308, [Measures].[Unit Sales])")
             .edgeCaseMdx("target NULL",             "BottomSum([Gender].Members, NULL, [Measures].[Unit Sales])")
+            .edgeCaseMdx("value expression zero",       "BottomSum([Gender].Members, 50, 0)")
+            .edgeCaseMdx("value expression negative",   "BottomSum([Gender].Members, 50, -1)")
+            .edgeCaseMdx("value expression fractional", "BottomSum([Gender].Members, 50, 0.5)")
+            .edgeCaseMdx("value expression 1E308",      "BottomSum([Gender].Members, 50, 1E308)")
             .edgeCaseMdx("value expression NULL",   "BottomSum([Gender].Members, 50, NULL)")
 
             // TopBottomPercentSumCalc starts runningTotal at 0 and stops as soon as
@@ -51,6 +58,7 @@ public final class BottomSumContract {
             // 0 (or a NULL target, treated as 0) or below therefore yields the empty set before
             // any member is examined, regardless of the cube's data.
             .value("Count(BottomSum([Gender].Members, 0, [Measures].[Unit Sales]))",    "0")
+            .value("Count(BottomSum([Gender].Members, -1, [Measures].[Unit Sales]))",   "0")
             .value("Count(BottomSum([Gender].Members, -10, [Measures].[Unit Sales]))",  "0")
             .value("Count(BottomSum([Gender].Members, NULL, [Measures].[Unit Sales]))", "0")
             .value("Count(BottomSum({}, 50, [Measures].[Unit Sales]))",                 "0")

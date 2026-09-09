@@ -52,7 +52,7 @@ public class LastPeriodsCalc extends AbstractProfilingNestedTupleListCalc {
      */
     private List<Member> lastPeriods(Member member, Evaluator evaluator, Integer indexValue) {
         // empty set
-        if ((indexValue == 0) || member.isNull()) {
+        if (indexValue == null || indexValue == 0 || member.isNull()) {
             return List.of();
         }
         List<Member> list = new ArrayList<>();

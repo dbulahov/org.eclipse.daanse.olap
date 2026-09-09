@@ -107,7 +107,16 @@ public class ParameterResolver extends AbstractMetaDataMultiResolver {
     @Override
     protected FunctionDefinition createFunDef(Expression[] args, FunctionMetaData functionMetaData,
             FunctionMetaData fmdTarget) {
-        String parameterName = ParameterFunDef.getParameterName(args);
+        // ParameterFunDef.getParameterName throws when args[0] is not a string literal — a
+        // precondition only the parser guarantees for real "Parameter('x', ...)" MDX. This
+        // method is reached from resolve() (see AbstractMetaDataMultiResolver.resolve()),
+        // which must stay a pure predicate (see CallAssert.resolutionDoesNotThrow, and
+        // ParamRefContract's identical finding): a non-literal Name here is a genuine "no
+        // overload matches" case, not something to throw past.
+        if (!(args[0] instanceof Literal<?> nameLiteral) || args[0].getCategory() != DataType.STRING) {
+            return null;
+        }
+        String parameterName = (String) nameLiteral.getValue();
         Expression typeArg = args[1];
         DataType category;
         Type type = typeArg.getType();
@@ -131,7 +140,14 @@ public class ParameterResolver extends AbstractMetaDataMultiResolver {
             break;
 
         case SYMBOL:
-            String s = (String) ((Literal<?>) typeArg).getValue();
+            // Same "resolve() must be a pure predicate" reasoning as the Name guard above:
+            // this used to cast typeArg to Literal unconditionally, throwing
+            // ClassCastException for any SYMBOL-typed argument the parser did not itself
+            // produce as a literal (e.g. this test kit's stub-based probing).
+            if (!(typeArg instanceof Literal<?> typeLiteral)) {
+                return null;
+            }
+            String s = (String) typeLiteral.getValue();
             if (s.equalsIgnoreCase("NUMERIC")) {
                 category = DataType.NUMERIC;
                 type = NumericType.INSTANCE;

@@ -37,9 +37,15 @@ public class SubsetCalc extends AbstractProfilingNestedTupleListCalc{
             evaluator.setNonEmpty(false);
             final TupleList list = tupleListCalc.evaluate(evaluator);
             final Integer start = startCalc.evaluate(evaluator);
+            if (start == null) {
+                return TupleCollections.emptyList(list.getArity());
+            }
             int end;
             if (countCalc != null) {
                 final Integer count = countCalc.evaluate(evaluator);
+                if (count == null) {
+                    return TupleCollections.emptyList(list.getArity());
+                }
                 end = start + count;
             } else {
                 end = list.size();

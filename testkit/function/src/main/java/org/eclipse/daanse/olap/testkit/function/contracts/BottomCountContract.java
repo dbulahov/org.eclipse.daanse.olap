@@ -42,12 +42,20 @@ public final class BottomCountContract {
             .autoEdgeCases()
             .edgeCaseMdx("empty set",              "BottomCount({}, 2)")
             .edgeCaseMdx("count zero",              "BottomCount([Gender].Members, 0)")
+            .edgeCaseMdx("count one",               "BottomCount([Gender].Members, 1)")
             // TopBottomCountCalc, unlike HeadCalc/TailCalc, does not clamp a negative count
             // before calling TupleList.subList: for BottomCount([Gender].Members, -1) it computes
             // list.subList(list.size() + 1, list.size()), a fromIndex past the list's size. That
             // is an IndexOutOfBoundsException, not a diagnosed OlapRuntimeException.
             .edgeCaseMdx("count negative",          "BottomCount([Gender].Members, -1)")
             .edgeCaseMdx("count beyond end",        "BottomCount([Gender].Members, 1000)")
+            // Safe: "list instanceof AbstractList && list.size() <= n" is true here (2 <=
+            // MAX_VALUE), so it takes the early-return branch and never reaches subList.
+            .edgeCaseMdx("count MAX_VALUE",         "BottomCount([Gender].Members, 2147483647)")
+            // Worse than plain "count negative": list.size() - n with n = Integer.MIN_VALUE
+            // overflows int arithmetic (2 - (-2147483648) wraps around to a negative fromIndex)
+            // before subList even gets a chance to reject it cleanly.
+            .edgeCaseMdx("count MIN_VALUE",         "BottomCount([Gender].Members, -2147483648)")
             .edgeCaseMdx("count NULL",              "BottomCount([Gender].Members, NULL)")
             .edgeCaseMdx("with order expression",   "BottomCount([Gender].Members, 1, [Measures].[Unit Sales])")
 

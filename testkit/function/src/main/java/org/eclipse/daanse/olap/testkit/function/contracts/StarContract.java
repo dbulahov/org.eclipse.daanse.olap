@@ -72,13 +72,17 @@ public final class StarContract {
             .autoEdgeCases()
             .edgeCaseMdx("zero",              "0 * 5")
             .edgeCaseMdx("negative",          "-3 * 4")
+            .edgeCaseMdx("operand -1",        "-1 * 5")
+            .edgeCaseMdx("fractional operand", "0.5 * 2")
             .edgeCaseMdx("null operand",      "NULL * 5")
             .edgeCaseMdx("largest double",    "1.7976931348623157E308 * 2")
+            .edgeCaseMdx("1E308 operand",     "1E308 * 2")
             .edgeCaseMdx("member operand",    "[Measures].[Unit Sales] * 1")
 
             .value("2 * 3",   "6")
             .value("0 * 5",   "0")
             .value("-3 * 4",  "-12")
+            .value("0.5 * 2", "1")
             .valueIsNull("NULL * 5")
 
             // Multiply, in scalar context.

@@ -27,14 +27,14 @@
 
 package org.eclipse.daanse.olap.fun;
 
+import org.eclipse.daanse.olap.api.exception.OlapRuntimeException;
+
 /**
  * Thrown while evaluating a cell expression
  *
  * @author jhyde, 14 June, 2002
  */
-public class DaanseEvaluationException extends RuntimeException {
-    public DaanseEvaluationException() {
-    }
+public class DaanseEvaluationException extends OlapRuntimeException {
     public DaanseEvaluationException(String s) {
         super(s);
     }

@@ -32,6 +32,9 @@ public class UCaseCalc extends AbstractProfilingNestedStringCalc {
     @Override
     public String evaluateInternal(Evaluator evaluator) {
         String value = getChildCalc(0, StringCalc.class).evaluate(evaluator);
+        if (value == null) {
+            return null;
+        }
         return value.toUpperCase(locale);
     }
 

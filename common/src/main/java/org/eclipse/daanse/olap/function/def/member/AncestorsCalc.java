@@ -37,7 +37,8 @@ public class AncestorsCalc extends AbstractProfilingNestedTupleListCalc {
         Member member = getChildCalc(0, MemberCalc.class).evaluate(evaluator);
         Integer distance = getChildCalc(1, IntegerCalc.class).evaluate(evaluator);
         List<Member> ancestors = new ArrayList<>();
-        for (int curDist = 1; curDist <= distance; curDist++) {
+        final int distanceOrZero = distance == null ? 0 : distance;
+        for (int curDist = 1; curDist <= distanceOrZero; curDist++) {
             ancestors.add(FunUtil.ancestor(evaluator, member, curDist, null));
         }
         return TupleCollections.asTupleList(ancestors);

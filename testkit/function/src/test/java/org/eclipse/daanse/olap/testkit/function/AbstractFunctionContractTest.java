@@ -165,7 +165,7 @@ public abstract class AbstractFunctionContractTest {
         }
         Connection connection = connection().orElse(null);
         return contract().values().stream().map(valueCase -> DynamicTest.dynamicTest(
-                contract().name() + " » Ergebnis » " + valueCase.mdx(),
+                contract().name() + " » Result » " + valueCase.mdx(),
                 () -> {
                     Assumptions.assumeTrue(connection != null, "stage B: no Connection supplied");
                     runValue(connection, valueCase);
@@ -181,7 +181,7 @@ public abstract class AbstractFunctionContractTest {
         }
         Connection connection = connection().orElse(null);
         return contract().dependencies().stream().map(dependencyCase -> DynamicTest.dynamicTest(
-                contract().name() + " » Abhängigkeiten » " + dependencyCase.mdx(),
+                contract().name() + " » Dependencies » " + dependencyCase.mdx(),
                 () -> {
                     Assumptions.assumeTrue(connection != null, "stage B: no Connection supplied");
                     runDependency(connection, dependencyCase);
@@ -197,7 +197,7 @@ public abstract class AbstractFunctionContractTest {
         }
         Connection connection = connection().orElse(null);
         return contract().resultStyles().stream().map(styleCase -> DynamicTest.dynamicTest(
-                contract().name() + " » Ergebnisform » " + styleCase.mdx(),
+                contract().name() + " » Result format » " + styleCase.mdx(),
                 () -> {
                     Assumptions.assumeTrue(connection != null, "stage B: no Connection supplied");
                     runResultStyle(connection, styleCase);

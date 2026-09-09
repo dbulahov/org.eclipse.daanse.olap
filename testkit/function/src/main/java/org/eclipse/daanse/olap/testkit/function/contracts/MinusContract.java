@@ -50,15 +50,19 @@ public final class MinusContract {
 
             .autoEdgeCases()
             .edgeCaseMdx("zero",              "0 - 5")
+            .edgeCaseMdx("negative operand",   "-1 - 0")
+            .edgeCaseMdx("fractional operand", "0.5 - 0")
             .edgeCaseMdx("negative result",    "3 - 10")
             .edgeCaseMdx("null left operand",  "NULL - 5")
             .edgeCaseMdx("null right operand", "5 - NULL")
             .edgeCaseMdx("largest double",     "1.7976931348623157E308 - -1.7976931348623157E308")
+            .edgeCaseMdx("1E308 operand",      "1E308 - 0")
             .edgeCaseMdx("member operand",     "[Measures].[Unit Sales] - 1")
 
             .value("5 - 3",   "2")
             .value("0 - 5",   "-5")
             .value("3 - 10",  "-7")
+            .value("-1 - 0",  "-1")
             .valueIsNull("NULL - 5")
             .valueIsNull("5 - NULL")
 

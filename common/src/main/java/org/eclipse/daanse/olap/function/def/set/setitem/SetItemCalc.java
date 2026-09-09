@@ -52,7 +52,7 @@ public class SetItemCalc extends AbstractProfilingNestedMemberCalc{
             final Integer index =
                 indexCalc.evaluate(evaluator);
             int listSize = list.size();
-            if (index >= listSize || index < 0) {
+            if (index == null || index >= listSize || index < 0) {
                 return nullMember;
             } else {
                 return list.get(index);

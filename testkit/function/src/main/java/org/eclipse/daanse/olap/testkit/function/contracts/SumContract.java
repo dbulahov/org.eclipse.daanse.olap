@@ -40,10 +40,17 @@ public final class SumContract {
             .autoEdgeCases()
             .edgeCaseMdx("empty set",              "Sum({})")
             .edgeCaseMdx("empty set with measure", "Sum({}, [Measures].[Unit Sales])")
+            .edgeCaseMdx("value expression zero",       "Sum([Gender].Members, 0)")
+            .edgeCaseMdx("value expression negative",   "Sum([Gender].Members, -1)")
+            .edgeCaseMdx("value expression fractional", "Sum([Gender].Members, 0.5)")
+            .edgeCaseMdx("value expression 1E308",      "Sum([Gender].Members, 1E308)")
             .edgeCaseMdx("null value expression",  "Sum([Gender].Members, NULL)")
 
             // MDX distinguishes Sum({}) = NULL from Sum({0}) = 0.
             .value("Sum({[Gender].[F], [Gender].[M]}, [Measures].[Unit Sales])", "266,773")
+            // A constant value expression is evaluated once per member of the set: two
+            // [Gender] members times a constant -1 sums to -2.
+            .value("Sum([Gender].Members, -1)", "-2")
             .valueIsNull("Sum({})")
             .valueIsNull("Sum({}, [Measures].[Unit Sales])")
 

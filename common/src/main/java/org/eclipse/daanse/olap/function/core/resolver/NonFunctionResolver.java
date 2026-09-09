@@ -13,6 +13,7 @@
  */
 package org.eclipse.daanse.olap.function.core.resolver;
 
+import java.util.List;
 import java.util.Optional;
 
 import org.eclipse.daanse.mdx.model.api.expression.operation.OperationAtom;
@@ -26,12 +27,12 @@ import org.eclipse.daanse.olap.api.query.component.Expression;
 public class NonFunctionResolver implements FunctionResolver {
 
     private FunctionMetaData functionMetaData;
-    
+
     public NonFunctionResolver(FunctionMetaData functionMetaData) {
         this.functionMetaData = functionMetaData;
     }
 
-    
+
     @Override
     public OperationAtom getFunctionAtom() {
         return functionMetaData.operationAtom();
@@ -40,6 +41,11 @@ public class NonFunctionResolver implements FunctionResolver {
     @Override
     public Optional<FunctionResolutionResult> resolve(Expression[] args, Validator validator) {
         return Optional.empty();
+    }
+
+    @Override
+    public List<FunctionMetaData> getRepresentativeFunctionMetaDatas() {
+        return List.of(functionMetaData);
     }
 
     @Override

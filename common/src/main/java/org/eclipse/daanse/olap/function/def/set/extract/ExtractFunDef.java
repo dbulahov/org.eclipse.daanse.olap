@@ -69,12 +69,19 @@ public class ExtractFunDef extends AbstractFunctionDefinition {
 
     public static void findExtractedHierarchies(Expression[] args, List<Hierarchy> extractedHierarchies,
             List<Integer> extractedOrdinals) {
-        SetType type = (SetType) args[0].getType();
+        // args[0] is normally a SetType by now (implicit Member/Tuple -> Set conversions are
+        // applied before compileCall/getResultType run), but a Level -> Set conversion is
+        // never materialized into an actual set literal, so it can still arrive here as a
+        // LevelType. Derive the hierarchies from whatever type actually shows up instead of
+        // assuming SetType and casting blindly.
+        final Type type0 = args[0].getType();
         final List<Hierarchy> hierarchies;
-        if (type.getElementType() instanceof TupleType tupleType) {
+        if (type0 instanceof SetType setType) {
+            hierarchies = setType.getHierarchies();
+        } else if (type0 instanceof TupleType tupleType) {
             hierarchies = tupleType.getHierarchies();
         } else {
-            hierarchies = Collections.singletonList(type.getHierarchy());
+            hierarchies = Collections.singletonList(type0.getHierarchy());
         }
         for (Hierarchy hierarchy : hierarchies) {
             if (hierarchy == null) {

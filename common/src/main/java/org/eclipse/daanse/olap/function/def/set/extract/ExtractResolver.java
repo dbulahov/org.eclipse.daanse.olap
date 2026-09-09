@@ -22,7 +22,6 @@ import java.util.Optional;
 
 import org.eclipse.daanse.mdx.model.api.expression.operation.OperationAtom;
 import org.eclipse.daanse.olap.api.DataType;
-import org.eclipse.daanse.olap.api.element.Hierarchy;
 import org.eclipse.daanse.olap.api.function.FunctionInterface;
 import org.eclipse.daanse.olap.api.function.FunctionMetaData;
 import org.eclipse.daanse.olap.api.function.FunctionResolutionResult;
@@ -49,19 +48,15 @@ public class ExtractResolver extends NoExpressionRequiredFunctionResolver {
             }
         }
 
-        // Find the dimensionality of the set expression.
-
-        // Form a list of ordinals of the hierarchies being extracted.
-        // For example, in
-        // Extract(X.Members * Y.Members * Z.Members, Z, X)
-        // the hierarchy ordinals are X=0, Y=1, Z=2, and the extracted
-        // ordinals are {2, 0}.
-        //
-        // Each hierarchy extracted must exist in the LHS,
-        // and no hierarchy may be extracted more than once.
-        List<Integer> extractedOrdinals = new ArrayList<>();
-        final List<Hierarchy> extractedHierarchies = new ArrayList<>();
-        ExtractFunDef.findExtractedHierarchies(args, extractedHierarchies, extractedOrdinals);
+        // Whether the hierarchies named by args[1..] actually belong to the LHS set (and are
+        // each named at most once) is a semantic check, not a shape/type check: it needs the
+        // hierarchy identities named in args[0], and — for
+        // Extract(X.Members * Y.Members * Z.Members, Z, X) — the ordinal of each one within
+        // the LHS's dimensionality (X=0, Y=1, Z=2, so the extracted ordinals are {2, 0}).
+        // resolve() must be a pure predicate over argument shape and never throw, so that
+        // check is deliberately left to ExtractFunDef.getResultType/compileCall, which run
+        // once resolution has already matched this overload and can report a precise,
+        // diagnosed error instead of a generic "no function matches signature".
         FunctionParameterR[] parameterTypes = new FunctionParameterR[args.length];
         parameterTypes[0] = FunctionParameterR.param(DataType.SET);
         Arrays.fill(parameterTypes, 1, parameterTypes.length, FunctionParameterR.param(DataType.HIERARCHY));

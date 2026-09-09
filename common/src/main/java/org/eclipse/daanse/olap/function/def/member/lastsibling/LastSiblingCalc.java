@@ -31,10 +31,10 @@ public class LastSiblingCalc extends AbstractProfilingNestedMemberCalc {
     @Override
     public Member evaluateInternal(Evaluator evaluator) {
         Member member = getChildCalc(0, MemberCalc.class).evaluate(evaluator);
-        return firstSibling(member, evaluator);
+        return lastSibling(member, evaluator);
     }
 
-    private Member firstSibling(Member member, Evaluator evaluator) {
+    private Member lastSibling(Member member, Evaluator evaluator) {
         Member parent = member.getParentMember();
         List<Member> children;
         final CatalogReader schemaReader = evaluator.getCatalogReader();

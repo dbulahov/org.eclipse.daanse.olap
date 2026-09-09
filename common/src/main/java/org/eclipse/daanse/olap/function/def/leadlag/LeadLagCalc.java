@@ -32,7 +32,8 @@ public class LeadLagCalc extends AbstractProfilingNestedMemberCalc {
     @Override
     public Member evaluateInternal(Evaluator evaluator) {
         Member member = getChildCalc(0, MemberCalc.class).evaluate(evaluator);
-        Integer n = getChildCalc(1, IntegerCalc.class).evaluate(evaluator);
+        Integer nBoxed = getChildCalc(1, IntegerCalc.class).evaluate(evaluator);
+        int n = nBoxed == null ? 0 : nBoxed;
         if (lag) {
             if (n == Integer.MIN_VALUE) {
                 // Bump up lagValue by one, otherwise -n (used

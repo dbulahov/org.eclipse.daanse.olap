@@ -47,7 +47,7 @@ public class DrilldownLevelWithIndexCalc extends AbstractProfilingNestedTupleLis
             return list;
         }
         final Integer index = indexCalc.evaluate(evaluator);
-        if (index < 0 || index >= arity) {
+        if (index == null || index < 0 || index >= arity) {
             return list;
         }
         HashMap<Member, List<Member>> calcMembersByParent = DrilldownLevelCalc

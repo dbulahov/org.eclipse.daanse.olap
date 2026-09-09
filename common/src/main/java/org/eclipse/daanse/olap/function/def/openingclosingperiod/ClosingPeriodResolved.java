@@ -44,9 +44,19 @@ public class ClosingPeriodResolved extends AbstractFunctionDefinitionMultiResolv
             DataType.MEMBER, new FunctionParameterR[] { FunctionParameterR.param(DataType.MEMBER) }).interfaceName(FunctionInterface.DATETIME);
 
     public ClosingPeriodResolved() {
+        // AbstractFunctionDefinitionMultiResolver.resolve() returns the *first* declaration in
+        // this list that FunctionMetaDataMatcher.match accepts — it does not compare
+        // conversion cost across the whole list the way resolution across separate resolvers
+        // does. A Member argument converts to Level at cost 1 (see TypeUtil.canConvert), so
+        // with the (Level) overload listed before the (Member) one, a genuine
+        // ClosingPeriod(<Member>) call was being captured by the (Level) overload (arity 1,
+        // treating the sole argument as a Level and substituting the default Time hierarchy's
+        // current member) instead of the (Member) one it actually matches exactly. A Level
+        // argument never converts to Member (TypeUtil.convertFromLevel has no MEMBER case), so
+        // this reordering does not affect the (Level) overload's own resolution.
         super(List.of(new OpeningClosingPeriodFunDef(functionMetaDataWithoutParam, false),
+                new OpeningClosingPeriodFunDef(functionMetaDataWithMember, false),
                 new OpeningClosingPeriodFunDef(functionMetaDataWithLevel, false),
-                new OpeningClosingPeriodFunDef(functionMetaDataWithLevelMember, false),
-                new OpeningClosingPeriodFunDef(functionMetaDataWithMember, false)));
+                new OpeningClosingPeriodFunDef(functionMetaDataWithLevelMember, false)));
     }
 }

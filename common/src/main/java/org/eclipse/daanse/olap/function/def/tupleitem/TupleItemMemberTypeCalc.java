@@ -32,7 +32,7 @@ public class TupleItemMemberTypeCalc extends AbstractProfilingNestedMemberCalc{
                 getChildCalc(0, MemberCalc.class).evaluate(evaluator);
         final Integer index =
                 getChildCalc(1, IntegerCalc.class).evaluate(evaluator);
-        if (index != 0) {
+        if (index == null || index != 0) {
             return null;
         }
         return member;
