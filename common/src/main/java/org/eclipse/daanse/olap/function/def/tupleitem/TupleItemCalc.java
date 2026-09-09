@@ -40,10 +40,13 @@ public class TupleItemCalc extends AbstractProfilingNestedMemberCalc{
         assert members == null
             || members.length == nullTupleMembers.length;
         final Integer index = getChildCalc(1, IntegerCalc.class).evaluate(evaluator);
-        if (members == null) {
-            return nullTupleMembers[index];
+        if (index == null || index < 0) {
+            return null;
         }
-        if (index >= members.length || index < 0) {
+        if (members == null) {
+            return index < nullTupleMembers.length ? nullTupleMembers[index] : null;
+        }
+        if (index >= members.length) {
             return null;
         }
         return members[index];

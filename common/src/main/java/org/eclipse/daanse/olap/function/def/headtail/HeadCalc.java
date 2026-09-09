@@ -42,7 +42,7 @@ public class HeadCalc extends AbstractProfilingNestedTupleListCalc {
 
     private TupleList head(final Integer count, final TupleList members) {
         assert members != null;
-        if (count <= 0) {
+        if (count == null || count <= 0) {
             return TupleCollections.emptyList(members.getArity());
         }
         return members.subList(0, Math.min(count, members.size()));

@@ -45,7 +45,7 @@ import org.eclipse.daanse.olap.function.def.AbstractFunctionDefinition;
  * @author jhyde
  * @since Mar 23, 2006
  */
-class PeriodsToDateFunDef extends AbstractFunctionDefinition {
+public class PeriodsToDateFunDef extends AbstractFunctionDefinition {
 
     public PeriodsToDateFunDef(FunctionMetaData functionMetaData) {
         super(functionMetaData);

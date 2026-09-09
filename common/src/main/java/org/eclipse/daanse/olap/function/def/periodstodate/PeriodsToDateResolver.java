@@ -29,8 +29,15 @@ import org.osgi.service.component.annotations.Component;
 public class PeriodsToDateResolver extends AbstractFunctionDefinitionMultiResolver {
     private static FunctionOperationAtom atom = new FunctionOperationAtom("PeriodsToDate");
     private static String DESCRIPTION = "Returns a set of periods (members) from a specified level starting with the first period and ending with a specified member.";
-    private static FunctionParameterR[] lm = { FunctionParameterR.param(DataType.SET).asOptional(),
-            FunctionParameterR.param(DataType.NUMERIC).asOptional() };
+    // Must be LEVEL/MEMBER, matching what compileCall actually compiles them as
+    // (compiler.compileLevel(arg 0), compiler.compileMember(arg 1)) and the "fxlm" (Level,
+    // Member) signature the comment below documents. This used to be declared SET/NUMERIC —
+    // a plain LEVEL and MEMBER each still satisfy that by implicit conversion (Level -> Set
+    // cost 1, Member -> Numeric cost 3) so ordinary calls kept resolving, but it also let a
+    // genuine SET or NUMERIC argument (e.g. "PeriodsToDate([Time].[Month], 5)") match at cost
+    // 0 and then crash in compileCall instead of being cleanly rejected at resolution.
+    private static FunctionParameterR[] lm = { FunctionParameterR.param(DataType.LEVEL, "Level").asOptional(),
+            FunctionParameterR.param(DataType.MEMBER, "Member").asOptional() };
     // {"fx", "fxl", "fxlm"}
 
     private static FunctionMetaData functionMetaData = new FunctionMetaDataR(atom, DESCRIPTION,

@@ -29,7 +29,7 @@ import org.eclipse.daanse.olap.function.core.FunctionMetaDataR;
 import org.eclipse.daanse.olap.function.core.FunctionParameterR;
 import org.eclipse.daanse.olap.function.def.AbstractFunctionDefinition;
 
-class DimensionsStringFunDef extends AbstractFunctionDefinition {
+public class DimensionsStringFunDef extends AbstractFunctionDefinition {
 
     static final OperationAtom functionAtom = new FunctionOperationAtom("Dimensions");
 

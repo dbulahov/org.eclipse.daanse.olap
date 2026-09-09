@@ -21,6 +21,7 @@ import org.eclipse.daanse.olap.api.function.FunctionDefinition;
 import org.eclipse.daanse.olap.api.function.FunctionMetaData;
 import org.eclipse.daanse.olap.api.function.FunctionResolver;
 import org.eclipse.daanse.olap.api.query.component.Expression;
+import org.eclipse.daanse.olap.api.query.component.Literal;
 import org.eclipse.daanse.olap.function.core.FunctionMetaDataR;
 import org.eclipse.daanse.olap.function.core.FunctionParameterR;
 import org.eclipse.daanse.olap.function.core.resolver.AbstractMetaDataMultiResolver;
@@ -49,7 +50,16 @@ public class ParamRefResolver  extends AbstractMetaDataMultiResolver {
     @Override
     protected FunctionDefinition createFunDef(Expression[] args, FunctionMetaData functionMetaData,
             FunctionMetaData fmdTarget) {
-        String parameterName = ParameterFunDef.getParameterName(args);
+        // ParameterFunDef.getParameterName throws when args[0] is not a string literal — a
+        // precondition only the parser guarantees for real "ParamRef('x')" MDX. This method
+        // is reached from resolve() (see AbstractMetaDataMultiResolver.resolve()), which must
+        // stay a pure predicate (see CallAssert.resolutionDoesNotThrow): a non-literal Name
+        // here is a genuine "no overload matches" case, not something to throw past. Real
+        // validation still gets a proper diagnosed error later, from QueryImpl.
+        if (!(args[0] instanceof Literal<?> literal) || args[0].getCategory() != DataType.STRING) {
+            return null;
+        }
+        String parameterName = (String) literal.getValue();
         return new ParameterFunDef(
             functionMetaData, parameterName, null, DataType.UNKNOWN, null,
             null);

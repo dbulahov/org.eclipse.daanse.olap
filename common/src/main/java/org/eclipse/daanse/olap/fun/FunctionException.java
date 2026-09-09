@@ -13,7 +13,9 @@
  */
 package org.eclipse.daanse.olap.fun;
 
-public class FunctionException extends RuntimeException {
+import org.eclipse.daanse.olap.api.exception.OlapRuntimeException;
+
+public class FunctionException extends OlapRuntimeException {
 
     public FunctionException(String msg) {
         super(msg);

@@ -42,12 +42,12 @@ public class TailCalc extends AbstractProfilingNestedTupleListCalc {
 
     private TupleList tail(final Integer count, final TupleList members) {
         assert members != null;
+        if (count == null || count <= 0) {
+            return TupleCollections.emptyList(members.getArity());
+        }
         final int memberCount = members.size();
         if (count >= memberCount) {
             return members;
-        }
-        if (count <= 0) {
-            return TupleCollections.emptyList(members.getArity());
         }
         return members.subList(members.size() - count, members.size());
     }

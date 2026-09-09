@@ -27,7 +27,8 @@ import org.eclipse.daanse.olap.api.function.FunctionResolver;
 import org.eclipse.daanse.olap.api.query.Validator;
 import org.eclipse.daanse.olap.api.query.component.Expression;
 import org.eclipse.daanse.olap.api.type.SetType;
-import org.eclipse.daanse.olap.common.Util;
+import org.eclipse.daanse.olap.api.type.TupleType;
+import org.eclipse.daanse.olap.api.type.Type;
 import org.eclipse.daanse.olap.function.core.FunctionMetaDataR;
 import org.eclipse.daanse.olap.function.core.resolver.FunctionResolutionResultR;
 import org.eclipse.daanse.olap.function.core.resolver.NoExpressionRequiredFunctionResolver;
@@ -43,11 +44,24 @@ public class SetItemStringResolver extends NoExpressionRequiredFunctionResolver 
             return Optional.empty();
         }
         final Expression setExp = args[0];
-        if (!(setExp.getType() instanceof SetType)) {
+        // Mirror SetItemIntResolver's generic conversion behavior (a Level/Member/Tuple/
+        // Dimension/Hierarchy arg can convert to Set/Tuple, see TypeUtil.canConvert) instead
+        // of demanding a literal SetType: a Level -> Set conversion in particular is declared
+        // but never materialized into an actual set literal by compile time (see
+        // ExtractContract's identical finding), so a strict instanceof check here silently
+        // rejected calls the declared signature advertises as accepted.
+        if (!validator.canConvert(0, setExp, DataType.SET, conversions)) {
             return Optional.empty();
         }
-        final SetType setType = (SetType) setExp.getType();
-        final int arity = setType.getArity();
+        final Type type0 = setExp.getType();
+        final int arity;
+        if (type0 instanceof SetType setType) {
+            arity = setType.getArity();
+        } else if (type0 instanceof TupleType tupleType) {
+            arity = tupleType.getArity();
+        } else {
+            arity = 1;
+        }
         // All args must be strings.
         for (int i = 1; i < args.length; i++) {
             if (!validator.canConvert(i, args[i], DataType.STRING, conversions)) {
@@ -55,7 +69,12 @@ public class SetItemStringResolver extends NoExpressionRequiredFunctionResolver 
             }
         }
         if (args.length - 1 != arity) {
-            throw Util.newError("Argument count does not match set's cardinality " + arity);
+            // Not a shape/type mismatch resolve() can coerce past — a genuine "no overload
+            // matches" case. resolve() must be a pure predicate (see
+            // CallAssert.resolutionDoesNotThrow): throwing here would abort the whole query's
+            // validation with a stack trace instead of a clean "no function matches signature"
+            // message, even when a differently-shaped call would have matched fine.
+            return Optional.empty();
         }
         final DataType category = arity == 1 ? DataType.MEMBER : DataType.TUPLE;
 

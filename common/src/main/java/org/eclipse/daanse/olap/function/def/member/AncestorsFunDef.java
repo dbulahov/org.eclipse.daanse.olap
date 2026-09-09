@@ -13,23 +13,15 @@
 */
 package org.eclipse.daanse.olap.function.def.member;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import org.eclipse.daanse.olap.api.calc.Calc;
 import org.eclipse.daanse.olap.api.calc.IntegerCalc;
 import org.eclipse.daanse.olap.api.calc.LevelCalc;
 import org.eclipse.daanse.olap.api.calc.MemberCalc;
 import org.eclipse.daanse.olap.api.calc.compiler.ExpressionCompiler;
-import org.eclipse.daanse.olap.api.calc.tuple.TupleList;
-import org.eclipse.daanse.olap.api.element.Member;
-import org.eclipse.daanse.olap.api.evaluator.Evaluator;
 import org.eclipse.daanse.olap.api.function.FunctionMetaData;
 import org.eclipse.daanse.olap.api.query.component.ResolvedFunCall;
 import org.eclipse.daanse.olap.api.type.LevelType;
 import org.eclipse.daanse.olap.api.type.Type;
-import org.eclipse.daanse.olap.calc.base.type.tuplebase.TupleCollections;
-import org.eclipse.daanse.olap.fun.FunUtil;
 import org.eclipse.daanse.olap.function.def.AbstractFunctionDefinition;
 
 public class AncestorsFunDef extends AbstractFunctionDefinition {
@@ -47,18 +39,9 @@ public class AncestorsFunDef extends AbstractFunctionDefinition {
             return new AncestorsCalcForLevelType(call.getType(), memberCalc, levelCalc);
         } else {
             final IntegerCalc distanceCalc = compiler.compileInteger(call.getArg(1));
-            return new AncestorsCalc(call.getType(), memberCalc, distanceCalc) {
-                @Override
-                public TupleList evaluateInternal(Evaluator evaluator) {
-                    Member member = memberCalc.evaluate(evaluator);
-                    Integer distance = distanceCalc.evaluate(evaluator);
-                    List<Member> ancestors = new ArrayList<>();
-                    for (int curDist = 1; curDist <= distance; curDist++) {
-                        ancestors.add(FunUtil.ancestor(evaluator, member, curDist, null));
-                    }
-                    return TupleCollections.asTupleList(ancestors);
-                }
-            };
+            // AncestorsCalc.evaluateInternal already does exactly this (member/distance from
+            // its own child calcs) — no need to duplicate it in an anonymous override.
+            return new AncestorsCalc(call.getType(), memberCalc, distanceCalc);
         }
     }
 

@@ -44,9 +44,13 @@ public final class HeadContract {
             .edgeCaseMdx("empty set",           "Head({}, 2)")
             .edgeCaseMdx("empty set, no count", "Head({})")
             .edgeCaseMdx("count zero",          "Head([Gender].Members, 0)")
+            .edgeCaseMdx("count one",           "Head([Gender].Members, 1)")
             .edgeCaseMdx("count negative",      "Head([Gender].Members, -1)")
             .edgeCaseMdx("count beyond end",    "Head([Gender].Members, 1000)")
             .edgeCaseMdx("count MAX_VALUE",     "Head([Gender].Members, 2147483647)")
+            .edgeCaseMdx("count MIN_VALUE",     "Head([Gender].Members, -2147483648)")
+            // A null count is treated like count <= 0 (empty result) — HeadCalc.head checks
+            // "count == null || count <= 0" before ever unboxing count.
             .edgeCaseMdx("count NULL",          "Head([Gender].Members, NULL)")
 
 
@@ -54,6 +58,7 @@ public final class HeadContract {
             .value("Count(Head([Gender].Members, 0))",    "0")
             .value("Count(Head({}, 5))",                  "0")
             .value("Count(Head([Gender].Members, 1000))", "2")
+            .value("Count(Head([Gender].Members, NULL))", "0")
 
 
             .dependsOn("Head([Gender].Members, 2)", "[Gender].[Gender]")

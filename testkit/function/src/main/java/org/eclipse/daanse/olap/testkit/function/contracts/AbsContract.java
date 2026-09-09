@@ -42,12 +42,15 @@ public final class AbsContract {
 
             .autoEdgeCases()
             .edgeCaseMdx("negative zero", "Abs(-0.0)")
+            .edgeCaseMdx("fractional operand", "Abs(0.5)")
             .edgeCaseMdx("largest double", "Abs(1.7976931348623157E308)")
+            .edgeCaseMdx("1E308 operand", "Abs(1E308)")
             .edgeCaseMdx("null argument", "Abs(NULL)")
 
             .value("Abs(-3)", "3")
             .value("Abs(3)", "3")
             .value("Abs(0)", "0")
+            .value("Abs(-1)", "1")
             .value("Abs(-2.5)", "2.5")
             .valueIsNull("Abs(NULL)")
 

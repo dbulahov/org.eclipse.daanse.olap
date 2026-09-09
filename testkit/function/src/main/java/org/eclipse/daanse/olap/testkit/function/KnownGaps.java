@@ -22,9 +22,6 @@ public final class KnownGaps {
 
     /** Key format is {@code "Name (AtomClassSimpleName)"} — see {@code FunctionContract.key()}. */
     public static final Set<String> ALLOWED = Set.of(
-            "NativizeSet (FunctionOperationAtom)",   // 1982 LOC, needs the native SQL path
-            "Parameter (FunctionOperationAtom)",     // needs Query.createOrLookupParam
-            "ParamRef (FunctionOperationAtom)"       // ditto
             // ... shrinking from 241 to 0
     );
 
