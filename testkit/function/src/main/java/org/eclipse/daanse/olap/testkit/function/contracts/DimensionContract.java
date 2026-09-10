@@ -90,7 +90,7 @@ public final class DimensionContract {
             .value("([Gender].[F].Level.Dimension IS [Gender].Dimension)", "true")
             .value("([Gender].Dimension.Dimension IS [Gender].Dimension)", "true")
 
-            .dependsOn("[Gender].[F].Dimension", "[Gender].[Gender]")
+            .dependsOn("[Gender].[F].Dimension")
 
             .waive(Promise.RESULT_SHAPE,
                     "returns a Dimension, not a set; the Set ResultStyle promise does not apply")

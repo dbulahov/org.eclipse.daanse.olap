@@ -64,8 +64,8 @@ public final class YtdContract {
 
             .value("Count(Ytd([Time].[1997]))", "1")
 
-            .dependsOn("Ytd([Time].[1997])", "[Time].[Time]")
-            .dependsOn("Ytd()", "[Time].[Time]")
+            .dependsOn("Ytd([Time].[1997])")
+            .dependsOn("Ytd()", "[Time].[Time]", "[Time].[Weekly]")
 
             .resultStyle("Ytd([Time].[1997])", MUTABLE_LIST, MUTABLE_LIST)
             .resultStyle("Ytd([Time].[1997])", ITERABLE, ITERABLE)

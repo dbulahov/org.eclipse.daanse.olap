@@ -71,7 +71,7 @@ public final class DataMemberContract {
                             + "implementation in this repository (see the class Javadoc) — its value for "
                             + "a member with no configured data member cannot be verified here.")
 
-            .dependsOn("[Gender].[F].DataMember", "[Gender].[Gender]")
+            .dependsOn("[Gender].[F].DataMember")
 
             .waive(Promise.RESULT_SHAPE,
                     "returns a Member, not a set; the Set ResultStyle promise does not apply")

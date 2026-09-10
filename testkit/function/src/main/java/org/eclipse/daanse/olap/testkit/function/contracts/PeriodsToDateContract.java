@@ -93,7 +93,7 @@ public final class PeriodsToDateContract {
             // degenerates to the single-element list [member], not a multi-quarter range.
             .value("Count(PeriodsToDate([Time].[Quarter], [Time].[1997].[Q2]))", "1")
 
-            .dependsOn("PeriodsToDate([Time].[Quarter], [Time].[1997].[Q2])", "[Time].[Time]")
+            .dependsOn("PeriodsToDate([Time].[Quarter], [Time].[1997].[Q2])")
             .dependsOn("PeriodsToDate()", "[Time].[Time]")
 
             .resultStyle("PeriodsToDate([Time].[Quarter], [Time].[1997].[Q2])", MUTABLE_LIST, MUTABLE_LIST)

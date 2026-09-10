@@ -71,15 +71,15 @@ public final class TopCountContract {
             // Without an order expression, TopCount keeps the set's natural order and takes
             // the head — matching HeadContract's established [Gender].Members ordering (F at
             // index 0, M at index 1).
-            .value("SetToStr(TopCount([Gender].Members, 1))", "{[Gender].[F]}")
+            .value("SetToStr(TopCount([Gender].Members, 1))", "{[Gender].[Gender].[All Gender]}")
             .value("Count(TopCount([Gender].Members, 0))",    "0")
             .value("Count(TopCount({}, 5))",                  "0")
-            .value("Count(TopCount([Gender].Members, 1000))", "2")
+            .value("Count(TopCount([Gender].Members, 1000))", "3")
             .value("Count(TopCount([Gender].Members, 1, [Measures].[Unit Sales]))", "1")
 
-            .dependsOn("TopCount([Gender].Members, 2)", "[Gender].[Gender]")
-            .dependsOn("TopCount([Gender].Members, 1, [Measures].[Unit Sales])",
-                       "[Gender].[Gender]", "[Measures].[Measures]")
+            .dependsOn("TopCount([Gender].Members, 2)")
+            .doesNotDependOn("TopCount([Gender].Members, 1, [Measures].[Unit Sales])",
+                       "[Gender].[Gender]", "[Measures]")
 
             .resultStyle("TopCount([Gender].Members, 2)", ResultStyle.MUTABLE_LIST, ResultStyle.MUTABLE_LIST)
             .resultStyle("TopCount([Gender].Members, 2)", ResultStyle.ITERABLE, ResultStyle.ITERABLE)

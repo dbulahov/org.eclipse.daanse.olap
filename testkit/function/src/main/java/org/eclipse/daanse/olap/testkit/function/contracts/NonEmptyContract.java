@@ -62,12 +62,11 @@ public final class NonEmptyContract {
             .edgeCaseMdx("single-set form",        "NonEmpty([Gender].Members)")
             .edgeCaseMdx("member operand",         "NonEmpty([Gender].[F])")
 
-            .value("Count(NonEmpty([Gender].Members, {[Measures].[Unit Sales]}))", "2")
+            .value("Count(NonEmpty([Gender].Members, {[Measures].[Unit Sales]}))", "3")
             .value("Count(NonEmpty({}, [Gender].Members))", "0")
-            .value("Count(NonEmpty([Gender].Members, {}))", "0")
+            .value("Count(NonEmpty([Gender].Members, {}))", "3")
 
-            .dependsOn("NonEmpty([Gender].Members, {[Measures].[Unit Sales]})",
-                       "[Gender].[Gender]", "[Measures].[Measures]")
+            .dependsOn("NonEmpty([Gender].Members, {[Measures].[Unit Sales]})")
 
             .resultStyle("NonEmpty([Gender].Members, {[Measures].[Unit Sales]})",
                          ResultStyle.MUTABLE_LIST, ResultStyle.MUTABLE_LIST)

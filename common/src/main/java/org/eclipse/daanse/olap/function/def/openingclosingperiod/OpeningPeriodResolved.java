@@ -31,13 +31,30 @@ public class OpeningPeriodResolved extends AbstractFunctionDefinitionMultiResolv
 
     private static OperationAtom atom = new FunctionOperationAtom("OpeningPeriod");
     private static String DESCRIPTION = "Returns the first descendant of a member at a level.";
-    // {"fm", "fml", "fmlm"}
+    // {"fm", "fml", "fmlm", "fmm"}
 
-    private static FunctionMetaData functionMetaData = new FunctionMetaDataR(atom, DESCRIPTION,
-            DataType.MEMBER, new FunctionParameterR[] { FunctionParameterR.param(DataType.LEVEL).asOptional(),
-                    FunctionParameterR.param(DataType.MEMBER).asOptional() }).interfaceName(FunctionInterface.DATETIME);
+    private static FunctionMetaData functionMetaDataWithoutParam = new FunctionMetaDataR(atom, DESCRIPTION,
+            DataType.MEMBER, new FunctionParameterR[] {}).interfaceName(FunctionInterface.DATETIME);
+    private static FunctionMetaData functionMetaDataWithLevel = new FunctionMetaDataR(atom, DESCRIPTION,
+            DataType.MEMBER, new FunctionParameterR[] { FunctionParameterR.param(DataType.LEVEL) }).interfaceName(FunctionInterface.DATETIME);
+    private static FunctionMetaData functionMetaDataWithLevelMember = new FunctionMetaDataR(atom, DESCRIPTION,
+            DataType.MEMBER, new FunctionParameterR[] { FunctionParameterR.param(DataType.LEVEL),
+                    FunctionParameterR.param(DataType.MEMBER) }).interfaceName(FunctionInterface.DATETIME);
+    private static FunctionMetaData functionMetaDataWithMember = new FunctionMetaDataR(atom, DESCRIPTION,
+            DataType.MEMBER, new FunctionParameterR[] { FunctionParameterR.param(DataType.MEMBER) }).interfaceName(FunctionInterface.DATETIME);
 
     public OpeningPeriodResolved() {
-        super(List.of(new OpeningClosingPeriodFunDef(functionMetaData, true)));
+        // See ClosingPeriodResolved: AbstractFunctionDefinitionMultiResolver.resolve() returns
+        // the *first* declaration in this list that FunctionMetaDataMatcher.match accepts — it
+        // does not compare conversion cost across the whole list the way resolution across
+        // separate resolvers does. A Member argument converts to Level at cost 1, so with the
+        // (Level) overload listed before the (Member) one, a genuine OpeningPeriod(<Member>)
+        // call would be captured by the (Level) overload instead of the (Member) one it
+        // actually matches exactly. A Level argument never converts to Member, so this
+        // reordering does not affect the (Level) overload's own resolution.
+        super(List.of(new OpeningClosingPeriodFunDef(functionMetaDataWithoutParam, true),
+                new OpeningClosingPeriodFunDef(functionMetaDataWithMember, true),
+                new OpeningClosingPeriodFunDef(functionMetaDataWithLevel, true),
+                new OpeningClosingPeriodFunDef(functionMetaDataWithLevelMember, true)));
     }
 }

@@ -69,11 +69,11 @@ public final class TopPercentContract {
             .value("Count(TopPercent([Gender].Members, -10, [Measures].[Unit Sales]))",  "0")
             .value("Count(TopPercent([Gender].Members, NULL, [Measures].[Unit Sales]))", "0")
             .value("Count(TopPercent({}, 50, [Measures].[Unit Sales]))",                 "0")
-            .value("Count(TopPercent([Gender].Members, 1000, [Measures].[Unit Sales]))", "2")
+            .value("Count(TopPercent([Gender].Members, 1000, [Measures].[Unit Sales]))", "3")
 
-            .dependsOn("TopPercent([Gender].Members, 50, [Measures].[Unit Sales])",
-                       "[Gender].[Gender]", "[Measures].[Measures]")
-            .dependsOn("TopPercent([Gender].Members, 50, 1)", "[Gender].[Gender]")
+            .doesNotDependOn("TopPercent([Gender].Members, 50, [Measures].[Unit Sales])",
+                       "[Gender].[Gender]", "[Measures]")
+            .dependsOn("TopPercent([Gender].Members, 50, 1)")
 
             .resultStyle("TopPercent([Gender].Members, 50, [Measures].[Unit Sales])",
                          ResultStyle.MUTABLE_LIST, ResultStyle.MUTABLE_LIST)

@@ -13,6 +13,7 @@
 */
 package org.eclipse.daanse.olap.function.def.openingclosingperiod;
 
+import org.eclipse.daanse.olap.api.DataType;
 import org.eclipse.daanse.olap.api.calc.Calc;
 import org.eclipse.daanse.olap.api.calc.LevelCalc;
 import org.eclipse.daanse.olap.api.calc.MemberCalc;
@@ -74,15 +75,28 @@ public class OpeningClosingPeriodFunDef extends AbstractFunctionDefinition {
             levelCalc = null;
             break;
         case 1:
-            defaultTimeHierarchy =
-                compiler.getEvaluator().getCube()
-                    .getTimeHierarchy(getFunctionMetaData().operationAtom().name());
-            levelCalc = compiler.compileLevel(call.getArg(0));
-            memberCalc =
-                new HierarchyCurrentMemberFixedCalc(
-
-                        MemberType.forHierarchy(defaultTimeHierarchy),
-                    defaultTimeHierarchy);
+            // ClosingPeriodResolved/OpeningPeriodResolved declare (Member) and (Level) as two
+            // separate one-arg overloads (see their own Javadoc), each constructing its own
+            // OpeningClosingPeriodFunDef instance with a distinct FunctionMetaData. Which one
+            // actually resolved the call — not merely the argument count — decides how to
+            // compile it: a genuine one-arg Member call must not be silently reinterpreted as
+            // a Level with an implicit default-Time member, or the member argument passed in
+            // is discarded entirely and a completely unrelated dimension's current member is
+            // used instead (the level/member dimension check below would then reject it, or
+            // worse, silently succeed for two same-named dimensions).
+            if (getFunctionMetaData().parameters()[0].dataType() == DataType.MEMBER) {
+                levelCalc = null;
+                memberCalc = compiler.compileMember(call.getArg(0));
+            } else {
+                defaultTimeHierarchy =
+                    compiler.getEvaluator().getCube()
+                        .getTimeHierarchy(getFunctionMetaData().operationAtom().name());
+                levelCalc = compiler.compileLevel(call.getArg(0));
+                memberCalc =
+                    new HierarchyCurrentMemberFixedCalc(
+                            MemberType.forHierarchy(defaultTimeHierarchy),
+                        defaultTimeHierarchy);
+            }
             break;
         default:
             levelCalc = compiler.compileLevel(call.getArg(0));

@@ -72,8 +72,8 @@ public final class FirstSiblingContract {
             .value("([Gender].[F].Parent.FirstSibling IS [Gender].[F].Parent)", "true")
             .value("([Gender].[F].Parent.Parent.FirstSibling IS [Gender].[F].Parent.Parent)", "true")
 
-            .dependsOn("[Gender].[M].FirstSibling", "[Gender].[Gender]")
-            .dependsOn("[Gender].[F].Parent.FirstSibling", "[Gender].[Gender]")
+            .dependsOn("[Gender].[M].FirstSibling")
+            .dependsOn("[Gender].[F].Parent.FirstSibling")
 
             .waive(Promise.RESULT_SHAPE,
                     "returns a Member, not a set; the Set ResultStyle promise does not apply")

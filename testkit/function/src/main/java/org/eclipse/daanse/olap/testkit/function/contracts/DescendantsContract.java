@@ -115,10 +115,10 @@ public final class DescendantsContract {
             .value("Count(Descendants([Gender].[F], [Gender].[F].Level))", "1")
             .value("Count(Descendants([Gender].[F].Parent, [Gender].[F].Level))", "2")
             .value("SetToStr(Descendants([Gender].[F].Parent, [Gender].[F].Level))",
-                   "{[Gender].[F], [Gender].[M]}")
+                   "{[Gender].[Gender].[F], [Gender].[Gender].[M]}")
 
-            .dependsOn("Descendants([Gender].[F].Parent, [Gender].[F].Level)", "[Gender].[Gender]")
-            .dependsOn("Descendants([Gender].Members, [Gender].[F].Level)", "[Gender].[Gender]")
+            .dependsOn("Descendants([Gender].[F].Parent, [Gender].[F].Level)")
+            .dependsOn("Descendants([Gender].Members, [Gender].[F].Level)")
 
             .resultStyle("Descendants([Gender].[F].Parent, [Gender].[F].Level)",
                          ResultStyle.MUTABLE_LIST, ResultStyle.MUTABLE_LIST)

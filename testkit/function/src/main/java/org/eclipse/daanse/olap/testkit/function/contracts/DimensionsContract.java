@@ -86,7 +86,7 @@ public final class DimensionsContract {
             // n=0 is the Measurement Hierarchy — DimensionNumericCalc.nthHierarchy's own
             // comment; a Mondrian-wide convention, not a schema-specific assumption.
             .value("Dimensions(0).Name", "Measures")
-            .value("(Dimensions(\"Gender\") IS [Gender])", "true")
+            .value("(Dimensions(\"Gender\") IS [Gender].Dimension)", "true")
 
             .dependsOn("Dimensions(0)")
             .dependsOn("Dimensions(\"Gender\")")

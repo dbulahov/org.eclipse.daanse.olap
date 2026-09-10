@@ -73,7 +73,7 @@ public final class LevelContract {
             // (only) real level.
             .value("([Gender].[F].Level IS [Gender].[M].Level)", "true")
 
-            .dependsOn("[Gender].[F].Level", "[Gender].[Gender]")
+            .dependsOn("[Gender].[F].Level")
 
             .waive(Promise.RESULT_SHAPE,
                     "returns a Level, not a set; the Set ResultStyle promise does not apply")

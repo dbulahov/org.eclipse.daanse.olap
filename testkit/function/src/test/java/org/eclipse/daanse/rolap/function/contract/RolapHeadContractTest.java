@@ -17,19 +17,24 @@ import org.eclipse.daanse.olap.api.connection.Connection;
 import org.eclipse.daanse.olap.testkit.function.AbstractFunctionContractTest;
 import org.eclipse.daanse.olap.testkit.function.contracts.FunctionContract;
 import org.eclipse.daanse.olap.testkit.function.contracts.HeadContract;
-import org.eclipse.daanse.rolap.testkit.junit.api.RolapContextTest;
-import org.junit.jupiter.api.Disabled;
-import org.eclipse.daanse.rolap.mapping.instance.emf.complex.foodmart.FoodmartTestInstance;
 
-@Disabled("disabled ubtil testkit implementation finished")
-@RolapContextTest(FoodmartTestInstance.class)
+import org.eclipse.daanse.rolap.testkit.junit.api.InjectRolap;
+import org.eclipse.daanse.rolap.testkit.junit.api.RolapContextTest;
+import org.eclipse.daanse.rolap.mapping.instance.emf.complex.foodmart.FoodmartTestInstance;
+import org.junit.jupiter.api.Disabled;
+
+// The @RolapContextTest wiring itself now works (see RolapCalculatedChildContractTest for a
+// passing example) — this one is disabled again because running it for real exposes genuine,
+// pre-existing bugs in HeadContract/HeadCalc (a [Gender].Members count/unique-name mismatch
+// inherited from assumptions written before Stage B could ever run, plus a real
+// ResultStyle/NPE bug in HeadCalc itself) that are out of scope here; fix them in the
+// follow-up audit, then re-enable.
+@Disabled("HeadContract/HeadCalc have real bugs surfaced by the now-working connection; fix in the follow-up audit")
+@RolapContextTest(value = FoodmartTestInstance.class)
 class RolapHeadContractTest extends AbstractFunctionContractTest {
 
-    private Connection connection;
-
-    RolapHeadContractTest(Connection connection) {
-        this.connection = connection;
-    }
+    @InjectRolap
+    Connection connection;
 
     @Override
     protected FunctionContract contract() {
@@ -41,8 +46,4 @@ class RolapHeadContractTest extends AbstractFunctionContractTest {
         return Optional.of(connection);
     }
 
-    @Override
-    protected String cubeName() {
-        return "Sales";
-    }
 }

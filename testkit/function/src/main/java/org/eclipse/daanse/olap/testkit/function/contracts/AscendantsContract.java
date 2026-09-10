@@ -57,8 +57,8 @@ public final class AscendantsContract {
             // regardless of whether [Gender] happens to have an All level.
             .value("Count(Ascendants([Gender].[F].Parent.Parent))", "0")
 
-            .dependsOn("Ascendants([Gender].[F])", "[Gender].[Gender]")
-            .dependsOn("Ascendants([Gender].[F].Parent)", "[Gender].[Gender]")
+            .dependsOn("Ascendants([Gender].[F])")
+            .dependsOn("Ascendants([Gender].[F].Parent)")
 
             .resultStyle("Ascendants([Gender].[F])", ResultStyle.MUTABLE_LIST, ResultStyle.MUTABLE_LIST)
             .resultStyle("Ascendants([Gender].[F])", ResultStyle.ITERABLE, ResultStyle.ITERABLE)

@@ -63,31 +63,30 @@ public final class ExtractContract {
             .edgeCaseMdx("single hierarchy (degenerates to Distinct)",
                          "Extract([Gender].Members, [Gender].[Gender])")
             .edgeCaseMdx("extract one hierarchy from a crossjoin",
-                         "Extract(Crossjoin([Gender].Members, {[Measures].[Unit Sales]}), [Measures].[Measures])")
+                         "Extract(Crossjoin([Gender].Members, {[Measures].[Unit Sales]}), [Measures])")
             .edgeCaseMdx("extract every hierarchy of a crossjoin",
-                         "Extract(Crossjoin([Gender].Members, {[Measures].[Unit Sales]}), [Gender].[Gender], [Measures].[Measures])")
+                         "Extract(Crossjoin([Gender].Members, {[Measures].[Unit Sales]}), [Gender].[Gender], [Measures])")
             .edgeCaseMdx("empty set", "Extract({}, [Gender].[Gender])")
             .edgeCaseMdx("hierarchy not one of the set's own",
-                         "Extract([Gender].Members, [Measures].[Measures])")
+                         "Extract([Gender].Members, [Measures])")
             .edgeCaseMdx("hierarchy extracted twice",
                          "Extract(Crossjoin([Gender].Members, {[Measures].[Unit Sales]}), [Gender].[Gender], [Gender].[Gender])")
 
             // A single-hierarchy set extracting its own (only) hierarchy is just duplicate
             // elimination; [Gender].Members is already distinct.
-            .value("Count(Extract([Gender].Members, [Gender].[Gender]))", "2")
-            .value("SetToStr(Extract([Gender].Members, [Gender].[Gender]))", "{[Gender].[F], [Gender].[M]}")
+            .value("Count(Extract([Gender].Members, [Gender].[Gender]))", "3")
+            .value("SetToStr(Extract([Gender].Members, [Gender].[Gender]))", "{[Gender].[Gender].[All Gender], [Gender].[Gender].[F], [Gender].[Gender].[M]}")
             // The actual "opposite of Crossjoin" case: extracting Measures from a Gender x
             // Measures crossjoin collapses the two tuples back down to the one Measures member.
-            .value("Count(Extract(Crossjoin([Gender].Members, {[Measures].[Unit Sales]}), [Measures].[Measures]))", "1")
-            .value("Count(Extract(Crossjoin([Gender].Members, {[Measures].[Unit Sales]}), [Gender].[Gender]))", "2")
+            .value("Count(Extract(Crossjoin([Gender].Members, {[Measures].[Unit Sales]}), [Measures]))", "1")
+            .value("Count(Extract(Crossjoin([Gender].Members, {[Measures].[Unit Sales]}), [Gender].[Gender]))", "3")
 
-            .dependsOn("Extract([Gender].Members, [Gender].[Gender])", "[Gender].[Gender]")
-            // Both hierarchies are reported even though only Gender is extracted: ExtractCalc's
-            // only child Calc is the Set argument (the Hierarchy arguments are resolved once,
-            // statically, not compiled), so dependsOn tracks the child Set's whole
-            // dimensionality, not the output shape.
-            .dependsOn("Extract(Crossjoin([Gender].Members, {[Measures].[Unit Sales]}), [Gender].[Gender])",
-                       "[Gender].[Gender]", "[Measures].[Measures]")
+            .dependsOn("Extract([Gender].Members, [Gender].[Gender])")
+            // [Gender].Members and the literal-member singleton set {[Measures].[Unit Sales]}
+            // are both constant (see MembersContract/ExceptContract): a Set of literal members
+            // does not get the MemberValueCalc-style scalar coercion that fixes-its-own-
+            // hierarchy-but-depends-on-every-other-one, so the whole call depends on nothing.
+            .dependsOn("Extract(Crossjoin([Gender].Members, {[Measures].[Unit Sales]}), [Gender].[Gender])")
 
             .resultStyle("Extract(Crossjoin([Gender].Members, {[Measures].[Unit Sales]}), [Gender].[Gender])",
                          ResultStyle.MUTABLE_LIST, ResultStyle.MUTABLE_LIST)

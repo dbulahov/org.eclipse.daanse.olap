@@ -58,12 +58,11 @@ public final class CrossjoinContract {
             .edgeCaseMdx("duplicate hierarchy", "Crossjoin([Gender].Members, [Gender].Members)")
 
             .value("SetToStr(Crossjoin({[Gender].[F]}, {[Measures].[Unit Sales]}))",
-                   "{([Gender].[F], [Measures].[Unit Sales])}")
-            .value("Count(Crossjoin([Gender].Members, {[Measures].[Unit Sales]}))", "2")
+                   "{([Gender].[Gender].[F], [Measures].[Unit Sales])}")
+            .value("Count(Crossjoin([Gender].Members, {[Measures].[Unit Sales]}))", "3")
             .value("Count(Crossjoin({}, [Gender].Members))", "0")
 
-            .dependsOn("Crossjoin([Gender].Members, {[Measures].[Unit Sales]})",
-                       "[Gender].[Gender]", "[Measures].[Measures]")
+            .dependsOn("Crossjoin([Gender].Members, {[Measures].[Unit Sales]})")
 
             .resultStyle("Crossjoin([Gender].Members, {[Measures].[Unit Sales]})",
                          ResultStyle.MUTABLE_LIST, ResultStyle.MUTABLE_LIST)

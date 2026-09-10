@@ -63,7 +63,7 @@ public final class WtdContract {
             .edgeCaseMdx("no argument (implicit current Time member)", "Wtd()")
             .edgeCaseMdx("member NULL",                                "Wtd(NULL)")
 
-            .dependsOn("Wtd()", "[Time].[Time]")
+            .dependsOn("Wtd()", "[Time].[Time]", "[Time].[Weekly]")
 
             .waive(Promise.RESULT,
                     "no Week-level member is known to exist/be nameable in this test kit's Time "

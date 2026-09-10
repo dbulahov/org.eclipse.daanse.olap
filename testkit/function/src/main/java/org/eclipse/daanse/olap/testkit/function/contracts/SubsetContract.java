@@ -72,15 +72,15 @@ public final class SubsetContract {
             .edgeCaseMdx("count MAX_VALUE (documented overflow gap)",
                     "Subset([Gender].Members, 1, 2147483647)")
 
-            .value("Count(Subset([Gender].Members, 0))", "2")
-            .value("Count(Subset([Gender].Members, 1))", "1")
-            .value("Subset([Gender].Members, 1).Item(0).Name", "M")
+            .value("Count(Subset([Gender].Members, 0))", "3")
+            .value("Count(Subset([Gender].Members, 1))", "2")
+            .value("Subset([Gender].Members, 1).Item(0).Name", "F")
             .value("Count(Subset([Gender].Members, 0, 1))", "1")
-            .value("Subset([Gender].Members, 0, 1).Item(0).Name", "F")
+            .value("Subset([Gender].Members, 0, 1).Item(0).Name", "All Gender")
             .value("Count(Subset([Gender].Members, 5))", "0")
             .value("Count(Subset([Gender].Members, NULL))", "0")
 
-            .dependsOn("Subset([Gender].Members, 0, 1)", "[Gender].[Gender]")
+            .dependsOn("Subset([Gender].Members, 0, 1)")
 
             .resultStyle("Subset([Gender].Members, 0, 1)", ResultStyle.MUTABLE_LIST, ResultStyle.MUTABLE_LIST)
             .resultStyle("Subset([Gender].Members, 0, 1)", ResultStyle.ITERABLE, ResultStyle.ITERABLE)

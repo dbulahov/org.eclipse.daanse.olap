@@ -26,8 +26,9 @@ import org.eclipse.daanse.olap.function.def.drilldownmember.DrilldownMemberFunDe
  * still printed in the declared signature (parameter optionality does not change how
  * {@code FunctionPrinter} renders the overload text). Unlike
  * {@link DrilldownLevelBottomContract}/{@link DrilldownLevelTopContract}, {@code
- * DrilldownMemberCalc} does not override {@code dependsOn}: both set arguments' hierarchies
- * are reported.
+ * DrilldownMemberCalc} does not override {@code dependsOn}: the generic child-calc walk
+ * applies. Both arguments here are constant (see {@link ExceptContract}), so the whole call
+ * depends on nothing (verified against a real connection).
  */
 public final class DrilldownMemberContract {
 
@@ -68,14 +69,13 @@ public final class DrilldownMemberContract {
 
             // [Gender] members are leaves (one real level beneath (All)): whether or not a
             // member is present in Set2, there are no children to drill down to.
-            .value("Count(DrilldownMember([Gender].Members, {[Gender].[F]}))", "2")
-            .value("SetToStr(DrilldownMember([Gender].Members, {[Gender].[F]}))", "{[Gender].[F], [Gender].[M]}")
+            .value("Count(DrilldownMember([Gender].Members, {[Gender].[F]}))", "3")
+            .value("SetToStr(DrilldownMember([Gender].Members, {[Gender].[F]}))", "{[Gender].[Gender].[All Gender], [Gender].[Gender].[F], [Gender].[Gender].[M]}")
             .value("Count(DrilldownMember({}, [Gender].Members))", "0")
-            .value("Count(DrilldownMember([Gender].Members, {}))", "2")
+            .value("Count(DrilldownMember([Gender].Members, {}))", "3")
 
-            .dependsOn("DrilldownMember([Gender].Members, {[Gender].[F]})", "[Gender].[Gender]")
-            .dependsOn("DrilldownMember([Gender].Members, {[Measures].[Unit Sales]})",
-                       "[Gender].[Gender]", "[Measures].[Measures]")
+            .dependsOn("DrilldownMember([Gender].Members, {[Gender].[F]})")
+            .dependsOn("DrilldownMember([Gender].Members, {[Measures].[Unit Sales]})")
 
             .resultStyle("DrilldownMember([Gender].Members, {[Gender].[F]})",
                          ResultStyle.MUTABLE_LIST, ResultStyle.MUTABLE_LIST)

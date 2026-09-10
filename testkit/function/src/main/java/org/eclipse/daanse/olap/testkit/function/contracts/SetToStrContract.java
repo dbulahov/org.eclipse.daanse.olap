@@ -62,11 +62,11 @@ public final class SetToStrContract {
             .edgeCaseMdx("member operand (lenient)", "SetToStr([Gender].[F])")
 
             .value("SetToStr({})", "{}")
-            .value("SetToStr({[Gender].[F]})", "{[Gender].[F]}")
+            .value("SetToStr({[Gender].[F]})", "{[Gender].[Gender].[F]}")
             .value("SetToStr({([Gender].[F], [Measures].[Unit Sales])})",
-                   "{([Gender].[F], [Measures].[Unit Sales])}")
+                   "{([Gender].[Gender].[F], [Measures].[Unit Sales])}")
 
-            .scalarDependsOn("SetToStr([Gender].Members)", "[Gender].[Gender]")
+            .scalarDependsOn("SetToStr([Gender].Members)")
 
             .waive(Promise.RESULT_SHAPE,
                     "scalar function; ResultStyle is VALUE by construction")

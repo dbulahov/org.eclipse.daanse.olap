@@ -36,6 +36,15 @@ import org.eclipse.daanse.olap.testkit.function.contracts.FunctionContract.Promi
  * compiles into a {@code FormatCalc} with a second child for the mask itself — so a
  * non-literal Format expression's own hierarchy dependencies are reported too, not just the
  * Value's.
+ *
+ * <p>Neither {@code FormatLiteralCalc} nor {@code FormatCalc} overrides {@code dependsOn}; both
+ * use the generic "depends on hierarchy if any child calc does" walk. A literal member Value
+ * argument like {@code [Measures].[Unit Sales]} is coerced to a scalar via an implicit {@code
+ * MemberValueCalc}-style wrapper, which — the same "depends on everything except the hierarchy
+ * it fixes" shape {@link ValueContract}/{@link MinusContract} document — therefore does
+ * <em>not</em> depend on {@code Measures} itself, but does depend on every other hierarchy in
+ * the cube. A dynamic reference like {@code [Gender].CurrentMember.Name} has no such fixed
+ * hierarchy and genuinely does depend on {@code Gender}, asserted below unchanged.
  */
 public final class FormatContract {
 
@@ -78,7 +87,7 @@ public final class FormatContract {
             // reference to it would.
             .value("Format([Measures].[Unit Sales], \"#,##0\")", "266,773")
 
-            .scalarDependsOn("Format([Measures].[Unit Sales], \"#,##0\")", "[Measures].[Measures]")
+            .scalarDoesNotDependOn("Format([Measures].[Unit Sales], \"#,##0\")", "[Measures]")
             .scalarDependsOn("Format(1234, [Gender].CurrentMember.Name)", "[Gender].[Gender]")
 
             .waive(Promise.RESULT_SHAPE,

@@ -69,13 +69,13 @@ public final class LastPeriodsContract {
             .value("Count(LastPeriods(0, [Gender].[F]))",   "0")
             .value("Count(LastPeriods(1, [Gender].[F]))",   "1")
             .value("Count(LastPeriods(NULL, [Gender].[F]))", "0")
-            .value("SetToStr(LastPeriods(2, [Gender].[M]))", "{[Gender].[F], [Gender].[M]}")
-            .value("SetToStr(LastPeriods(-2, [Gender].[F]))", "{[Gender].[F], [Gender].[M]}")
+            .value("SetToStr(LastPeriods(2, [Gender].[M]))", "{[Gender].[Gender].[F], [Gender].[Gender].[M]}")
+            .value("SetToStr(LastPeriods(-2, [Gender].[F]))", "{[Gender].[Gender].[F], [Gender].[Gender].[M]}")
             // Falling off the start/end of the level clamps to the first/last member instead
             // of returning fewer periods than asked for.
-            .value("SetToStr(LastPeriods(1000, [Gender].[M]))", "{[Gender].[F], [Gender].[M]}")
+            .value("SetToStr(LastPeriods(1000, [Gender].[M]))", "{[Gender].[Gender].[F], [Gender].[Gender].[M]}")
 
-            .dependsOn("LastPeriods(2, [Gender].[M])", "[Gender].[Gender]")
+            .dependsOn("LastPeriods(2, [Gender].[M])")
 
             .resultStyle("LastPeriods(2, [Gender].[M])", ResultStyle.MUTABLE_LIST, ResultStyle.MUTABLE_LIST)
             .resultStyle("LastPeriods(2, [Gender].[M])", ResultStyle.ITERABLE, ResultStyle.ITERABLE)

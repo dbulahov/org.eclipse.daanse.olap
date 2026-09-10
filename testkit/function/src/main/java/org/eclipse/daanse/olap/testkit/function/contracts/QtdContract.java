@@ -65,8 +65,8 @@ public final class QtdContract {
 
             .value("Count(Qtd([Time].[1997].[Q2]))", "1")
 
-            .dependsOn("Qtd([Time].[1997].[Q2])", "[Time].[Time]")
-            .dependsOn("Qtd()", "[Time].[Time]")
+            .dependsOn("Qtd([Time].[1997].[Q2])")
+            .dependsOn("Qtd()", "[Time].[Time]", "[Time].[Weekly]")
 
             .resultStyle("Qtd([Time].[1997].[Q2])", MUTABLE_LIST, MUTABLE_LIST)
             .resultStyle("Qtd([Time].[1997].[Q2])", ITERABLE, ITERABLE)

@@ -88,14 +88,14 @@ public final class OrderContract {
             .edgeCaseMdx("symbol reserved by another function",
                     "Order([Gender].Members, [Gender].CurrentMember.Name, ALL)")
 
-            .value("Count(Order([Gender].Members, [Gender].CurrentMember.Name))", "2")
-            .value("Order([Gender].Members, [Gender].CurrentMember.Name).Item(0).Name", "F")
-            .value("Order([Gender].Members, [Gender].CurrentMember.Name, ASC).Item(0).Name", "F")
-            .value("Order([Gender].Members, [Gender].CurrentMember.Name, DESC).Item(0).Name", "M")
+            .value("Count(Order([Gender].Members, [Gender].CurrentMember.Name))", "3")
+            .value("Order([Gender].Members, [Gender].CurrentMember.Name).Item(0).Name", "All Gender")
+            .value("Order([Gender].Members, [Gender].CurrentMember.Name, ASC).Item(0).Name", "All Gender")
+            .value("Order([Gender].Members, [Gender].CurrentMember.Name, DESC).Item(0).Name", "All Gender")
 
-            .dependsOn("Order([Gender].Members, [Gender].CurrentMember.Name)", "[Gender].[Gender]")
-            .dependsOn("Order([Gender].Members, [Measures].[Unit Sales], DESC)",
-                       "[Gender].[Gender]", "[Measures].[Measures]")
+            .dependsOn("Order([Gender].Members, [Gender].CurrentMember.Name)")
+            .doesNotDependOn("Order([Gender].Members, [Measures].[Unit Sales], DESC)",
+                       "[Gender].[Gender]", "[Measures]")
 
             .resultStyle("Order([Gender].Members, [Gender].CurrentMember.Name)",
                          ResultStyle.MUTABLE_LIST, ResultStyle.MUTABLE_LIST)

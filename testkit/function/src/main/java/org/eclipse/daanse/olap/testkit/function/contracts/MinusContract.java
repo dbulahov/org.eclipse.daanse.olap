@@ -28,6 +28,16 @@ import org.eclipse.daanse.olap.testkit.function.contracts.FunctionContract.Promi
  * <p>Unary negation ({@code - <Numeric Expression>}) is a separate atom —
  * {@code MinusPrefixOperatorDef} is a {@code PrefixOperationAtom("-")}, not this
  * {@code InfixOperationAtom("-")} — and has its own contract.
+ *
+ * <p>{@code MinusCalc} does not override {@code dependsOn}; it uses the generic "depends on
+ * hierarchy if any child calc does" walk. A literal member operand like {@code
+ * [Measures].[Unit Sales]} is coerced to a scalar via an implicit {@code MemberValueCalc}-style
+ * wrapper, which — the same "depends on everything except the hierarchy it fixes" shape {@link
+ * ValueContract}/{@link ValidMeasureContract}/{@link CalculatedChildContract} document —
+ * therefore does <em>not</em> depend on {@code Measures} itself, but does depend on every other
+ * hierarchy in the cube. Asserted below with {@code scalarDoesNotDependOn} only, for the same
+ * reason those contracts give: a positive {@code scalarDependsOn} would need every other
+ * hierarchy in the fixture cube listed to satisfy {@code dependsOnExactly}.
  */
 public final class MinusContract {
 
@@ -63,11 +73,11 @@ public final class MinusContract {
             .value("0 - 5",   "-5")
             .value("3 - 10",  "-7")
             .value("-1 - 0",  "-1")
-            .valueIsNull("NULL - 5")
-            .valueIsNull("5 - NULL")
+            .value("NULL - 5",  "-5")
+            .value("5 - NULL",  "5")
 
             .scalarDependsOn("5 - 3")                                        // depends on nothing
-            .scalarDependsOn("[Measures].[Unit Sales] - 1", "[Measures].[Measures]")
+            .scalarDoesNotDependOn("[Measures].[Unit Sales] - 1", "[Measures]")
 
             .waive(Promise.RESULT_SHAPE,
                     "scalar function; ResultStyle is VALUE by construction")

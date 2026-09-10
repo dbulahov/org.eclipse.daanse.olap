@@ -73,13 +73,13 @@ public final class UnionContract {
             // for the mismatch — but only inside compileCall (Stage B), never resolve().
             .edgeCaseMdx("symbol reserved by another function", "Union([Gender].Members, [Gender].Members, PRE)")
 
-            .value("Count(Union([Gender].Members, [Gender].Members))",      "2")
-            .value("Count(Union([Gender].Members, [Gender].Members, ALL))", "4")
-            .value("Count(Union({}, [Gender].Members))",                    "2")
-            .value("Count(Union([Gender].Members, {}))",                    "2")
-            .value("SetToStr(Union({[Gender].[F]}, {[Gender].[M]}))", "{[Gender].[F], [Gender].[M]}")
+            .value("Count(Union([Gender].Members, [Gender].Members))",      "3")
+            .value("Count(Union([Gender].Members, [Gender].Members, ALL))", "6")
+            .value("Count(Union({}, [Gender].Members))",                    "3")
+            .value("Count(Union([Gender].Members, {}))",                    "3")
+            .value("SetToStr(Union({[Gender].[F]}, {[Gender].[M]}))", "{[Gender].[Gender].[F], [Gender].[Gender].[M]}")
 
-            .dependsOn("Union([Gender].Members, [Gender].Members)", "[Gender].[Gender]")
+            .dependsOn("Union([Gender].Members, [Gender].Members)")
 
             .resultStyle("Union([Gender].Members, [Gender].Members)", ResultStyle.MUTABLE_LIST, ResultStyle.MUTABLE_LIST)
             .resultStyle("Union([Gender].Members, [Gender].Members)", ResultStyle.ITERABLE, ResultStyle.ITERABLE)

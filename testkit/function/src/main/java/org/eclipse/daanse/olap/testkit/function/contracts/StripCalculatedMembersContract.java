@@ -60,10 +60,10 @@ public final class StripCalculatedMembersContract {
             .edgeCaseMdx("no calculated members",  "StripCalculatedMembers([Gender].Members)")
             .edgeCaseMdx("member operand (lenient)", "StripCalculatedMembers([Gender].[F])")
 
-            .value("Count(StripCalculatedMembers([Gender].Members))", "2")
+            .value("Count(StripCalculatedMembers([Gender].Members))", "3")
             .value("Count(StripCalculatedMembers({}))", "0")
 
-            .dependsOn("StripCalculatedMembers([Gender].Members)", "[Gender].[Gender]")
+            .dependsOn("StripCalculatedMembers([Gender].Members)")
 
             .resultStyle("StripCalculatedMembers([Gender].Members)", ResultStyle.MUTABLE_LIST, ResultStyle.MUTABLE_LIST)
             .resultStyle("StripCalculatedMembers([Gender].Members)", ResultStyle.ITERABLE, ResultStyle.ITERABLE)

@@ -76,7 +76,7 @@ public final class CousinContract {
             .value("(Cousin([Gender].[F], [Gender].[F].Parent.Parent) IS [Gender].[F].Parent.Parent)", "true")
             .value("(Cousin([Gender].[F].Parent, [Gender].[F]) IS [Gender].[F].Parent.Parent)", "true")
 
-            .dependsOn("Cousin([Gender].[F], [Gender].[F].Parent)", "[Gender].[Gender]")
+            .dependsOn("Cousin([Gender].[F], [Gender].[F].Parent)")
 
             .waive(Promise.RESULT_SHAPE,
                     "returns a Member, not a set; the Set ResultStyle promise does not apply")

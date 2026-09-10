@@ -33,12 +33,37 @@ public class ParallelPeriodResolver extends AbstractFunctionDefinitionMultiResol
     private static String DESCRIPTION = "Returns a member from a prior period in the same relative position as a specified member.";
     // {"fm", "fml", "fmln", "fmlnm"}
 
-    private static FunctionMetaData functionMetaData = new FunctionMetaDataR(atom, DESCRIPTION,
-            DataType.MEMBER, new FunctionParameterR[] { FunctionParameterR.param(DataType.LEVEL).asOptional(),
-                    FunctionParameterR.param(DataType.NUMERIC).asOptional(),
-                    FunctionParameterR.param(DataType.MEMBER).asOptional() }).interfaceName(FunctionInterface.DATETIME);
+    private static FunctionMetaData functionMetaDataWithoutParam = new FunctionMetaDataR(atom, DESCRIPTION,
+            DataType.MEMBER, new FunctionParameterR[] {}).interfaceName(FunctionInterface.DATETIME);
+    private static FunctionMetaData functionMetaDataWithLevel = new FunctionMetaDataR(atom, DESCRIPTION,
+            DataType.MEMBER, new FunctionParameterR[] { FunctionParameterR.param(DataType.LEVEL) }).interfaceName(FunctionInterface.DATETIME);
+    private static FunctionMetaData functionMetaDataWithLevelNumeric = new FunctionMetaDataR(atom, DESCRIPTION,
+            DataType.MEMBER, new FunctionParameterR[] { FunctionParameterR.param(DataType.LEVEL),
+                    FunctionParameterR.param(DataType.NUMERIC) }).interfaceName(FunctionInterface.DATETIME);
+    private static FunctionMetaData functionMetaDataWithLevelNumericMember = new FunctionMetaDataR(atom, DESCRIPTION,
+            DataType.MEMBER, new FunctionParameterR[] { FunctionParameterR.param(DataType.LEVEL),
+                    FunctionParameterR.param(DataType.NUMERIC),
+                    FunctionParameterR.param(DataType.MEMBER) }).interfaceName(FunctionInterface.DATETIME);
 
     public ParallelPeriodResolver() {
-        super(List.of(new ParallelPeriodFunDef(functionMetaData)));
+        // See ClosingPeriodResolved/OpeningPeriodResolved: a single FunctionMetaData with
+        // trailing optional parameters lets FunctionMetaDataMatcher.match's positional, greedy
+        // walk skip a parameter it cannot bind and fall through to the next one instead of
+        // rejecting the call outright. With LEVEL, NUMERIC and MEMBER all optional here, a bare
+        // one-arg NUMERIC or TUPLE call (neither converts to LEVEL) fell through into the
+        // NUMERIC slot, and a bare one-arg HIERARCHY call (converts to neither LEVEL nor
+        // NUMERIC) fell through all the way into the MEMBER slot — both silently accepted
+        // instead of being rejected, only to fail later in ParallelPeriodFunDef.compileCall,
+        // which unconditionally treats a one-arg call as (Level). Fixed the same way: split
+        // into four separate declared overloads (0-arg, (Level), (Level, Numeric), (Level,
+        // Numeric, Member)) — each with only required parameters, so a category that cannot
+        // bind the parameter at its position fails the whole overload immediately instead of
+        // being skipped and retried against a later, unrelated parameter. The four overloads
+        // never overlap in arity, so list order does not matter for resolution the way it did
+        // for ClosingPeriod's two same-arity overloads.
+        super(List.of(new ParallelPeriodFunDef(functionMetaDataWithoutParam),
+                new ParallelPeriodFunDef(functionMetaDataWithLevel),
+                new ParallelPeriodFunDef(functionMetaDataWithLevelNumeric),
+                new ParallelPeriodFunDef(functionMetaDataWithLevelNumericMember)));
     }
 }

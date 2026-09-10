@@ -69,7 +69,7 @@ public final class SiblingsContract {
             // The null member has no siblings at all, not even itself.
             .value("Count([Gender].[F].Parent.Parent.Siblings)", "0")
 
-            .dependsOn("[Gender].[F].Siblings", "[Gender].[Gender]")
+            .dependsOn("[Gender].[F].Siblings")
 
             .resultStyle("[Gender].[F].Siblings", ResultStyle.MUTABLE_LIST, ResultStyle.MUTABLE_LIST)
             .resultStyle("[Gender].[F].Siblings", ResultStyle.ITERABLE, ResultStyle.ITERABLE)

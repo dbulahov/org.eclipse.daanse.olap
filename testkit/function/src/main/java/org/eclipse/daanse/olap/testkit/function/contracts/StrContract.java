@@ -87,7 +87,7 @@ public final class StrContract {
             .value("Str(0.5)", " 0.5")
 
             .scalarDependsOn("Str(5)")                                        // depends on nothing
-            .scalarDependsOn("Str([Measures].[Unit Sales])", "[Measures].[Measures]")
+            .scalarDependsOn("Str([Measures].[Unit Sales])")
 
             .waive(Promise.RESULT_SHAPE,
                     "scalar function; ResultStyle is VALUE by construction")

@@ -73,7 +73,7 @@ public final class UCaseContract {
             .value("UCase(\"[a]b&c\")", "[A]B&C")
 
             .scalarDependsOn("UCase(\"abc\")")                                        // depends on nothing
-            .scalarDependsOn("UCase([Measures].[Unit Sales])", "[Measures].[Measures]")
+            .scalarDoesNotDependOn("UCase([Measures].[Unit Sales])", "[Measures]")
 
             .waive(Promise.RESULT_SHAPE,
                     "scalar function; ResultStyle is VALUE by construction")

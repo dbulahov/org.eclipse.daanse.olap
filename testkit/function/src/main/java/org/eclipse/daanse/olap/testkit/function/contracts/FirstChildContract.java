@@ -69,8 +69,8 @@ public final class FirstChildContract {
             .value("([Gender].[F].FirstChild IS [Gender].[F].Parent.Parent)", "true")
             .value("([Gender].[F].Parent.FirstChild IS [Gender].[F])", "true")
 
-            .dependsOn("[Gender].[F].FirstChild", "[Gender].[Gender]")
-            .dependsOn("[Gender].[F].Parent.FirstChild", "[Gender].[Gender]")
+            .dependsOn("[Gender].[F].FirstChild")
+            .dependsOn("[Gender].[F].Parent.FirstChild")
 
             .waive(Promise.RESULT_SHAPE,
                     "returns a Member, not a set; the Set ResultStyle promise does not apply")

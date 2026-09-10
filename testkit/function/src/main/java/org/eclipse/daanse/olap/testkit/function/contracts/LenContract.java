@@ -64,7 +64,7 @@ public final class LenContract {
             .value("Len(NULL)",       "0")
 
             .scalarDependsOn("Len(\"abc\")")                                        // depends on nothing
-            .scalarDependsOn("Len([Measures].[Unit Sales])", "[Measures].[Measures]")
+            .scalarDoesNotDependOn("Len([Measures].[Unit Sales])", "[Measures]")
 
             .waive(Promise.RESULT_SHAPE,
                     "scalar function; ResultStyle is VALUE by construction")

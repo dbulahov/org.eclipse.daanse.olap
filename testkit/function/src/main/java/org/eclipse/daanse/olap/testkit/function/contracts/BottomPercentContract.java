@@ -64,11 +64,11 @@ public final class BottomPercentContract {
             .value("Count(BottomPercent({}, 50, [Measures].[Unit Sales]))",                 "0")
             // Cumulative percentages of a set never exceed ~100: a target of 1000 is
             // unreachable, so the loop runs to completion and keeps every member.
-            .value("Count(BottomPercent([Gender].Members, 1000, [Measures].[Unit Sales]))", "2")
+            .value("Count(BottomPercent([Gender].Members, 1000, [Measures].[Unit Sales]))", "3")
 
-            .dependsOn("BottomPercent([Gender].Members, 50, [Measures].[Unit Sales])",
-                       "[Gender].[Gender]", "[Measures].[Measures]")
-            .dependsOn("BottomPercent([Gender].Members, 50, 1)", "[Gender].[Gender]")
+            .doesNotDependOn("BottomPercent([Gender].Members, 50, [Measures].[Unit Sales])",
+                       "[Gender].[Gender]", "[Measures]")
+            .dependsOn("BottomPercent([Gender].Members, 50, 1)")
 
             .resultStyle("BottomPercent([Gender].Members, 50, [Measures].[Unit Sales])",
                          ResultStyle.MUTABLE_LIST, ResultStyle.MUTABLE_LIST)

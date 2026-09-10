@@ -48,16 +48,21 @@ public final class SumContract {
 
             // MDX distinguishes Sum({}) = NULL from Sum({0}) = 0.
             .value("Sum({[Gender].[F], [Gender].[M]}, [Measures].[Unit Sales])", "266,773")
-            // A constant value expression is evaluated once per member of the set: two
-            // [Gender] members times a constant -1 sums to -2.
-            .value("Sum([Gender].Members, -1)", "-2")
+            // A constant value expression is evaluated once per member of the set: [Gender]
+            // has 3 members (All, F, M — hasAll=true), so three times a constant -1 sums to -3.
+            .value("Sum([Gender].Members, -1)", "-3")
             .valueIsNull("Sum({})")
             .valueIsNull("Sum({}, [Measures].[Unit Sales])")
 
-            // The heart of Sum: the set's hierarchy is bound, the value expression's is not.
-            .scalarDependsOn("Sum([Gender].Members, [Measures].[Unit Sales])",
-                             "[Measures].[Measures]")               // NOT [Gender].[Gender]
-            .scalarDependsOn("Sum([Gender].Members)", "[Measures].[Measures]")
+            // The heart of Sum: the set's hierarchy is bound (excluded via
+            // checkAnyDependsButFirst), and the literal-member value expression fixes its own
+            // hierarchy (see MinusContract) — so the call depends on neither.
+            .scalarDoesNotDependOn("Sum([Gender].Members, [Measures].[Unit Sales])",
+                             "[Gender].[Gender]", "[Measures]")
+            // With the implicit current measure, the value expression is a
+            // CurrentValueUnknownCalc (depends on everything, Measures included), so only the
+            // set's own hierarchy is excluded.
+            .scalarDoesNotDependOn("Sum([Gender].Members)", "[Gender].[Gender]")
 
             .waive(Promise.RESULT_SHAPE,
                     "returns a scalar; the set argument's result shape is Aggregate's business")

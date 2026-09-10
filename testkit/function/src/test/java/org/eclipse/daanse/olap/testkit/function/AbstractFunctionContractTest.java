@@ -243,7 +243,9 @@ public abstract class AbstractFunctionContractTest {
     }
 
     private void runValue(Connection connection, ValueCase valueCase) {
-        String actual = MdxValues.formattedValueOf(connection, cubeName(), valueCase.mdx());
+        String actual = valueCase.formatString().isPresent()
+                ? MdxValues.formattedValueOf(connection, cubeName(), valueCase.mdx(), valueCase.formatString().get())
+                : MdxValues.formattedValueOf(connection, cubeName(), valueCase.mdx());
         if (!valueCase.expectedFormattedValue().equals(actual)) {
             throw org.eclipse.daanse.olap.testkit.assertions.AssertionMessages.mismatch(
                     "formatted value", "MDX", valueCase.mdx(),

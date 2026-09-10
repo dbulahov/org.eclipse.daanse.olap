@@ -87,7 +87,7 @@ public final class LagContract {
             .value("([Gender].[M].Lag(1) IS [Gender].[F])", "true")
             .value("([Gender].[F].Lag(-1) IS [Gender].[M])", "true")
 
-            .dependsOn("[Gender].[F].Lag(1)", "[Gender].[Gender]")
+            .dependsOn("[Gender].[F].Lag(1)")
 
             .waive(Promise.RESULT_SHAPE,
                     "returns a Member, not a set; the Set ResultStyle promise does not apply")

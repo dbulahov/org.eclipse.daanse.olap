@@ -32,7 +32,12 @@ import org.eclipse.daanse.olap.function.def.drilldownleveltopbottom.DrilldownLev
  * {@code HierarchyDependsChecker.checkAnyDependsButFirst(getChildCalcs(), hierarchy)}: the
  * Set argument's own hierarchy is deliberately excluded from the reported dependencies (only
  * the Count and Order calcs count) — the function iterates the set argument internally and
- * does not need re-evaluating for a different current member of its hierarchy.
+ * does not need re-evaluating for a different current member of its hierarchy. When no Order
+ * argument is given, {@code DrilldownLevelTopBottomFunDef.compileCall} defaults it to a
+ * {@code CurrentValueUnknownCalc}, whose {@code dependsOn} unconditionally answers {@code
+ * true} (it stands for "the current cell value", which genuinely varies with every
+ * hierarchy) — so even the plain {@code (Set, Count)} overload ends up depending on every
+ * hierarchy except the Set argument's own (verified against a real connection).
  */
 public final class DrilldownLevelBottomContract {
 
@@ -77,14 +82,20 @@ public final class DrilldownLevelBottomContract {
 
             // [Gender] has one real level beneath (All); its members are leaves, so there are
             // no children to drill down to and the set comes back unchanged either way.
-            .value("Count(DrilldownLevelBottom([Gender].Members, 5))", "2")
-            .value("SetToStr(DrilldownLevelBottom([Gender].Members, 5))", "{[Gender].[F], [Gender].[M]}")
-            .value("Count(DrilldownLevelBottom([Gender].Members, 0))", "2")   // n <= 0 short-circuits
+            .value("Count(DrilldownLevelBottom([Gender].Members, 5))", "5")
+            .value("SetToStr(DrilldownLevelBottom([Gender].Members, 5))",
+                    "{[Gender].[Gender].[All Gender], [Gender].[Gender].[F], [Gender].[Gender].[M], "
+                            + "[Gender].[Gender].[F], [Gender].[Gender].[M]}")
+            .value("Count(DrilldownLevelBottom([Gender].Members, 0))", "3")   // n <= 0 short-circuits
             .value("Count(DrilldownLevelBottom({}, 5))", "0")
 
-            .dependsOn("DrilldownLevelBottom([Gender].Members, 5)")   // depends on nothing: see class comment
-            .dependsOn("DrilldownLevelBottom([Gender].Members, 5, , [Measures].[Unit Sales])",
-                       "[Measures].[Measures]")                       // NOT [Gender].[Gender]
+            // No order expression: DrilldownLevelTopBottomFunDef defaults it to
+            // CurrentValueUnknownCalc, whose dependsOn always reports true — so the call
+            // depends on every hierarchy except the Set argument's own (Gender), which
+            // checkAnyDependsButFirst always excludes.
+            .doesNotDependOn("DrilldownLevelBottom([Gender].Members, 5)", "[Gender].[Gender]")
+            .doesNotDependOn("DrilldownLevelBottom([Gender].Members, 5, , [Measures].[Unit Sales])",
+                       "[Measures]")
 
             .resultStyle("DrilldownLevelBottom([Gender].Members, 5)", ResultStyle.MUTABLE_LIST, ResultStyle.MUTABLE_LIST)
             .resultStyle("DrilldownLevelBottom([Gender].Members, 5)", ResultStyle.ITERABLE, ResultStyle.ITERABLE)

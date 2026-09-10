@@ -54,13 +54,13 @@ public final class RangeContract {
             .edgeCaseMdx("both sides NULL",          "NULL : NULL")
 
             .value("Count([Gender].[F] : [Gender].[M])",   "2")
-            .value("SetToStr([Gender].[F] : [Gender].[F])", "{[Gender].[F]}")
+            .value("SetToStr([Gender].[F] : [Gender].[F])", "{[Gender].[Gender].[F]}")
             // RangeCalc.evaluateInternal returns {} whenever either endpoint is the null member,
             // whether that null came in as a compile-time NULL literal or a runtime .PrevMember.
             .value("Count([Gender].[F].PrevMember : [Gender].[M])", "0")
             .value("Count(NULL : [Gender].[F])",            "0")
 
-            .dependsOn("[Gender].[F] : [Gender].[M]", "[Gender].[Gender]")
+            .dependsOn("[Gender].[F] : [Gender].[M]")
             .dependsOn("[Gender].[F] : [Gender].CurrentMember", "[Gender].[Gender]")
 
             .resultStyle("[Gender].[F] : [Gender].[M]", ResultStyle.MUTABLE_LIST, ResultStyle.MUTABLE_LIST)

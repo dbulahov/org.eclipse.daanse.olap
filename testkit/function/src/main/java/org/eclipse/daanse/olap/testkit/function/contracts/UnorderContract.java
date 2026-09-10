@@ -58,11 +58,11 @@ public final class UnorderContract {
 
             // A pure pass-through today: the order the underlying set already has is
             // preserved exactly, nothing is shuffled.
-            .value("Count(Unorder([Gender].Members))", "2")
-            .value("SetToStr(Unorder([Gender].Members))", "{[Gender].[F], [Gender].[M]}")
+            .value("Count(Unorder([Gender].Members))", "3")
+            .value("SetToStr(Unorder([Gender].Members))", "{[Gender].[Gender].[All Gender], [Gender].[Gender].[F], [Gender].[Gender].[M]}")
             .value("Count(Unorder({}))", "0")
 
-            .dependsOn("Unorder([Gender].Members)", "[Gender].[Gender]")
+            .dependsOn("Unorder([Gender].Members)")
 
             .resultStyle("Unorder([Gender].Members)", ResultStyle.MUTABLE_LIST, ResultStyle.MUTABLE_LIST)
             .resultStyle("Unorder([Gender].Members)", ResultStyle.ITERABLE, ResultStyle.ITERABLE)

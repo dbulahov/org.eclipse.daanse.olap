@@ -65,11 +65,11 @@ public final class BottomSumContract {
             // SumContract established Sum({[Gender].[F], [Gender].[M]}, [Measures].[Unit Sales])
             // = 266,773 — a target well beyond that total is unreachable, so the loop runs to
             // completion and keeps every member.
-            .value("Count(BottomSum([Gender].Members, 1000000, [Measures].[Unit Sales]))", "2")
+            .value("Count(BottomSum([Gender].Members, 1000000, [Measures].[Unit Sales]))", "3")
 
-            .dependsOn("BottomSum([Gender].Members, 50, [Measures].[Unit Sales])",
-                       "[Gender].[Gender]", "[Measures].[Measures]")
-            .dependsOn("BottomSum([Gender].Members, 50, 1)", "[Gender].[Gender]")
+            .doesNotDependOn("BottomSum([Gender].Members, 50, [Measures].[Unit Sales])",
+                       "[Gender].[Gender]", "[Measures]")
+            .dependsOn("BottomSum([Gender].Members, 50, 1)")
 
             .resultStyle("BottomSum([Gender].Members, 50, [Measures].[Unit Sales])",
                          ResultStyle.MUTABLE_LIST, ResultStyle.MUTABLE_LIST)

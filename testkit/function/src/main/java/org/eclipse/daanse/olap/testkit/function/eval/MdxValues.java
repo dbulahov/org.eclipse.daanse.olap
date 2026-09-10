@@ -27,16 +27,26 @@ public final class MdxValues {
     }
 
     public static String formattedValueOf(Connection connection, String cubeName, String expression) {
-        return cellOf(connection, cubeName, expression).getFormattedValue();
+        return cellOf(connection, cubeName, expression, Optional.empty()).getFormattedValue();
+    }
+
+    /**
+     * Like {@link #formattedValueOf(Connection, String, String)}, but with an explicit
+     * {@code FORMAT_STRING} on the calculated member — the default cell format has no decimal
+     * places, so a fractional result would otherwise come back rounded to the nearest integer.
+     */
+    public static String formattedValueOf(Connection connection, String cubeName, String expression,
+            String formatString) {
+        return cellOf(connection, cubeName, expression, Optional.of(formatString)).getFormattedValue();
     }
 
     public static Object valueOf(Connection connection, String cubeName, String expression) {
-        return cellOf(connection, cubeName, expression).getValue();
+        return cellOf(connection, cubeName, expression, Optional.empty()).getValue();
     }
 
     public static Optional<Throwable> errorOf(Connection connection, String cubeName, String expression) {
         try {
-            Cell cell = cellOf(connection, cubeName, expression);
+            Cell cell = cellOf(connection, cubeName, expression, Optional.empty());
             return cell.isError() ? Optional.of((Throwable) cell.getValue()) : Optional.empty();
         } catch (Throwable thrown) {
             return Optional.of(thrown);
@@ -71,8 +81,10 @@ public final class MdxValues {
         return buf.toString();
     }
 
-    private static Cell cellOf(Connection connection, String cubeName, String expression) {
+    private static Cell cellOf(Connection connection, String cubeName, String expression,
+            Optional<String> formatString) {
         String mdx = "WITH MEMBER [Measures].[Foo] AS " + Util.singleQuoteString(expression)
+                + formatString.map(f -> ", FORMAT_STRING = " + Util.singleQuoteString(f)).orElse("")
                 + " SELECT {[Measures].[Foo]} ON COLUMNS FROM " + quotedCube(cubeName);
         return execute(connection, mdx).getCell(new int[] { 0 });
     }

@@ -60,11 +60,13 @@ public final class AllMembersContract {
             .edgeCaseMdx("level",     "[Gender].[F].Level.AllMembers")
 
             // [Gender] has no calculated members in the Sales cube: same members as .Members.
-            .value("SetToStr([Gender].AllMembers)",                 "{[Gender].[F], [Gender].[M]}")
-            .value("SetToStr([Gender].[F].Level.AllMembers)",       "{[Gender].[F], [Gender].[M]}")
+            .value("SetToStr([Gender].AllMembers)",
+                    "{[Gender].[Gender].[All Gender], [Gender].[Gender].[F], [Gender].[Gender].[M]}")
+            .value("SetToStr([Gender].[F].Level.AllMembers)",
+                    "{[Gender].[Gender].[F], [Gender].[Gender].[M]}")
 
-            .dependsOn("[Gender].AllMembers", "[Gender].[Gender]")
-            .dependsOn("[Gender].[F].Level.AllMembers", "[Gender].[Gender]")
+            .dependsOn("[Gender].AllMembers")
+            .dependsOn("[Gender].[F].Level.AllMembers")
 
             .resultStyle("[Gender].AllMembers", ResultStyle.MUTABLE_LIST, ResultStyle.MUTABLE_LIST)
             .resultStyle("[Gender].AllMembers", ResultStyle.ITERABLE, ResultStyle.ITERABLE)

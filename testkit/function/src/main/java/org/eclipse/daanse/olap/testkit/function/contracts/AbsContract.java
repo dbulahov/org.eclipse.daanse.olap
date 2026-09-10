@@ -51,11 +51,15 @@ public final class AbsContract {
             .value("Abs(3)", "3")
             .value("Abs(0)", "0")
             .value("Abs(-1)", "1")
-            .value("Abs(-2.5)", "2.5")
+            .value("Abs(-2.5)", "0.##########", "2.5")
             .valueIsNull("Abs(NULL)")
 
             .scalarDependsOn("Abs(1)")                                        // depends on nothing
-            .scalarDependsOn("Abs([Measures].[Unit Sales])", "[Measures].[Measures]")
+            // A fixed member operand doesn't depend on its own hierarchy but does depend on
+            // every other hierarchy in the cube — same "depends on everything except the
+            // hierarchy it fixes" shape MinusContract/ValueContract/ValidMeasureContract/
+            // CalculatedChildContract document.
+            .scalarDoesNotDependOn("Abs([Measures].[Unit Sales])", "[Measures]")
 
             .waive(Promise.RESULT_SHAPE,
                     "scalar function; ResultStyle is VALUE by construction")

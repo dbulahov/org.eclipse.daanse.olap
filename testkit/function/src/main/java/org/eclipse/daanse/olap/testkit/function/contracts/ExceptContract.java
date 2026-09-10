@@ -27,8 +27,11 @@ import org.eclipse.daanse.olap.function.def.except.ExceptFunDef;
  * optional {@code ALL} flag but never reads it ({@code // todo: implement ALL}): {@code
  * ExceptCalc} always removes duplicates, so {@code Except(Set1, Set2, ALL)} currently behaves
  * identically to {@code Except(Set1, Set2)}. Like {@code DrilldownMemberCalc} (and unlike
- * {@code DrilldownLevelTopBottomCalc}), {@code ExceptCalc} does not override {@code
- * dependsOn}: both set arguments' hierarchies are reported.
+ * {@code DrilldownLevelTopBottomCalc}), {@code ExceptCalc} does not override {@code dependsOn} —
+ * the generic child-calc walk applies. Both arguments here are constant (a {@code Members}
+ * enumeration and a literal-member set literal never get the {@code MemberValueCalc}-style
+ * scalar coercion — see {@link MembersContract}/{@link MinusContract}), so the whole call
+ * depends on nothing (verified against a real connection).
  */
 public final class ExceptContract {
 
@@ -67,15 +70,14 @@ public final class ExceptContract {
             .edgeCaseMdx("symbol reserved by another function",
                          "Except([Gender].Members, {[Gender].[F]}, RECURSIVE)")
 
-            .value("Count(Except([Gender].Members, {[Gender].[F]}))", "1")
-            .value("SetToStr(Except([Gender].Members, {[Gender].[F]}))", "{[Gender].[M]}")
+            .value("Count(Except([Gender].Members, {[Gender].[F]}))", "2")
+            .value("SetToStr(Except([Gender].Members, {[Gender].[F]}))", "{[Gender].[Gender].[All Gender], [Gender].[Gender].[M]}")
             .value("Count(Except([Gender].Members, [Gender].Members))", "0")
             .value("Count(Except({}, [Gender].Members))", "0")
-            .value("Count(Except([Gender].Members, {}))", "2")
+            .value("Count(Except([Gender].Members, {}))", "3")
 
-            .dependsOn("Except([Gender].Members, {[Gender].[F]})", "[Gender].[Gender]")
-            .dependsOn("Except([Gender].Members, {[Measures].[Unit Sales]})",
-                       "[Gender].[Gender]", "[Measures].[Measures]")
+            .dependsOn("Except([Gender].Members, {[Gender].[F]})")
+            .dependsOn("Except([Gender].Members, {[Measures].[Unit Sales]})")
 
             .resultStyle("Except([Gender].Members, {[Gender].[F]})", ResultStyle.MUTABLE_LIST, ResultStyle.MUTABLE_LIST)
             .resultStyle("Except([Gender].Members, {[Gender].[F]})", ResultStyle.ITERABLE, ResultStyle.ITERABLE)

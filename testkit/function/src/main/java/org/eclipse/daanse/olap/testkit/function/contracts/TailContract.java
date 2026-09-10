@@ -58,16 +58,15 @@ public final class TailContract {
 
             // Tail keeps the set's natural order and takes from the end — the mirror image of
             // Head, whose order is already pinned down by HeadContract.
-            .value("SetToStr(Tail([Gender].Members, 1))", "{[Gender].[M]}")
-            .value("SetToStr(Tail([Gender].Members))",    "{[Gender].[M]}")   // default count is 1
+            .value("SetToStr(Tail([Gender].Members, 1))", "{[Gender].[Gender].[M]}")
+            .value("SetToStr(Tail([Gender].Members))",    "{[Gender].[Gender].[M]}")   // default count is 1
             .value("Count(Tail([Gender].Members, 0))",    "0")
             .value("Count(Tail({}, 5))",                  "0")
-            .value("Count(Tail([Gender].Members, 1000))", "2")
+            .value("Count(Tail([Gender].Members, 1000))", "3")
             .value("Count(Tail([Gender].Members, NULL))", "0")
 
-            .dependsOn("Tail([Gender].Members, 2)", "[Gender].[Gender]")
-            .dependsOn("Tail([Gender].Members, [Measures].[Unit Sales])",
-                       "[Gender].[Gender]", "[Measures].[Measures]")
+            .dependsOn("Tail([Gender].Members, 2)")
+            .doesNotDependOn("Tail([Gender].Members, [Measures].[Unit Sales])", "[Measures]")
 
             .resultStyle("Tail([Gender].Members, 2)", ResultStyle.MUTABLE_LIST, ResultStyle.MUTABLE_LIST)
             .resultStyle("Tail([Gender].Members, 2)", ResultStyle.ITERABLE, ResultStyle.ITERABLE)

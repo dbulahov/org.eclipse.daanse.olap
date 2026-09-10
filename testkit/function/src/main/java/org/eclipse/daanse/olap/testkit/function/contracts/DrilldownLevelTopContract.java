@@ -72,14 +72,16 @@ public final class DrilldownLevelTopContract {
 
             // [Gender] has one real level beneath (All); its members are leaves, so there are
             // no children to drill down to and the set comes back unchanged either way.
-            .value("Count(DrilldownLevelTop([Gender].Members, 5))", "2")
-            .value("SetToStr(DrilldownLevelTop([Gender].Members, 5))", "{[Gender].[F], [Gender].[M]}")
-            .value("Count(DrilldownLevelTop([Gender].Members, 0))", "2")   // n <= 0 short-circuits
+            .value("Count(DrilldownLevelTop([Gender].Members, 5))", "5")
+            .value("SetToStr(DrilldownLevelTop([Gender].Members, 5))",
+                    "{[Gender].[Gender].[All Gender], [Gender].[Gender].[M], [Gender].[Gender].[F], "
+                            + "[Gender].[Gender].[F], [Gender].[Gender].[M]}")
+            .value("Count(DrilldownLevelTop([Gender].Members, 0))", "3")   // n <= 0 short-circuits
             .value("Count(DrilldownLevelTop({}, 5))", "0")
 
-            .dependsOn("DrilldownLevelTop([Gender].Members, 5)")   // depends on nothing: see class comment
-            .dependsOn("DrilldownLevelTop([Gender].Members, 5, , [Measures].[Unit Sales])",
-                       "[Measures].[Measures]")                    // NOT [Gender].[Gender]
+            .doesNotDependOn("DrilldownLevelTop([Gender].Members, 5)", "[Gender].[Gender]")
+            .doesNotDependOn("DrilldownLevelTop([Gender].Members, 5, , [Measures].[Unit Sales])",
+                       "[Measures]")
 
             .resultStyle("DrilldownLevelTop([Gender].Members, 5)", ResultStyle.MUTABLE_LIST, ResultStyle.MUTABLE_LIST)
             .resultStyle("DrilldownLevelTop([Gender].Members, 5)", ResultStyle.ITERABLE, ResultStyle.ITERABLE)

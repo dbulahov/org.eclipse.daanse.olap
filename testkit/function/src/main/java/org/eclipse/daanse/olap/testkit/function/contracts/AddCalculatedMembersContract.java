@@ -45,13 +45,13 @@ public final class AddCalculatedMembersContract {
             .edgeCaseMdx("no calculated members", "AddCalculatedMembers([Gender].Members)")
 
             // [Gender] has no calculated members in the Sales cube: a pure pass-through.
-            .value("SetToStr(AddCalculatedMembers([Gender].Members))", "{[Gender].[F], [Gender].[M]}")
+            .value("SetToStr(AddCalculatedMembers([Gender].Members))", "{[Gender].[Gender].[All Gender], [Gender].[Gender].[F], [Gender].[Gender].[M]}")
             // AddCalculatedMembers only ever appends; it never removes a member that was
             // already in the set — true regardless of how many calculated members exist.
             .value("Count(AddCalculatedMembers([Measures].Members)) >= Count([Measures].Members)", "true")
 
-            .dependsOn("AddCalculatedMembers([Gender].Members)", "[Gender].[Gender]")
-            .dependsOn("AddCalculatedMembers([Measures].Members)", "[Measures].[Measures]")
+            .dependsOn("AddCalculatedMembers([Gender].Members)")
+            .dependsOn("AddCalculatedMembers([Measures].Members)")
 
             .resultStyle("AddCalculatedMembers([Gender].Members)", ResultStyle.MUTABLE_LIST, ResultStyle.MUTABLE_LIST)
             .resultStyle("AddCalculatedMembers([Gender].Members)", ResultStyle.ITERABLE, ResultStyle.ITERABLE)

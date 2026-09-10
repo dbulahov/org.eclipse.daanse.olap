@@ -63,7 +63,7 @@ public final class HeadContract {
 
             .dependsOn("Head([Gender].Members, 2)", "[Gender].[Gender]")
             .dependsOn("Head([Gender].Members, [Measures].[Unit Sales])",
-                       "[Gender].[Gender]", "[Measures].[Measures]")
+                       "[Gender].[Gender]", "[Measures]")
 
             .resultStyle("Head([Gender].Members, 2)", ResultStyle.MUTABLE_LIST, ResultStyle.MUTABLE_LIST)
             .resultStyle("Head([Gender].Members, 2)", ResultStyle.ITERABLE, ResultStyle.ITERABLE)

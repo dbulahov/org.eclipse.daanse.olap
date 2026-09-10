@@ -83,11 +83,11 @@ public final class HierarchyContract {
             .edgeCaseMdx("member reference",               "[Gender].[F].Hierarchy")
             .edgeCaseMdx("hierarchy/dimension reference",  "[Gender].Hierarchy")
 
-            .value("([Gender].[F].Hierarchy IS [Gender])", "true")
-            .value("([Gender].[F].Level.Hierarchy IS [Gender])", "true")
+            .value("([Gender].[F].Hierarchy IS [Gender].Hierarchy)", "true")
+            .value("([Gender].[F].Level.Hierarchy IS [Gender].Hierarchy)", "true")
 
-            .dependsOn("[Gender].[F].Hierarchy", "[Gender].[Gender]")
-            .dependsOn("[Gender].[F].Level.Hierarchy", "[Gender].[Gender]")
+            .dependsOn("[Gender].[F].Hierarchy")
+            .dependsOn("[Gender].[F].Level.Hierarchy")
 
             .waive(Promise.RESULT_SHAPE,
                     "returns a Hierarchy, not a set; the Set ResultStyle promise does not apply")

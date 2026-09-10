@@ -88,8 +88,8 @@ public final class CaptionContract {
                             + "implementation in this repository (see the class Javadoc) — neither the "
                             + "exact caption string nor a fallback-to-name convention can be verified here.")
 
-            .scalarDependsOn("[Gender].[F].Caption", "[Gender].[Gender]")
-            .scalarDependsOn("[Gender].[F].Level.Caption", "[Gender].[Gender]")
+            .scalarDependsOn("[Gender].[F].Caption")
+            .scalarDependsOn("[Gender].[F].Level.Caption")
 
             .waive(Promise.RESULT_SHAPE,
                     "scalar function; ResultStyle is VALUE by construction")

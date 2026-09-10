@@ -82,7 +82,7 @@ public final class AncestorsContract {
             .value("Count(Ancestors([Gender].[F], [Gender].[F].Parent.Level))", "1")
             .value("(Ancestors([Gender].[F], 1).Item(0) IS [Gender].[F].Parent)", "true")
 
-            .dependsOn("Ancestors([Gender].[F], 1)", "[Gender].[Gender]")
+            .dependsOn("Ancestors([Gender].[F], 1)")
 
             .resultStyle("Ancestors([Gender].[F], 1)", ResultStyle.MUTABLE_LIST, ResultStyle.MUTABLE_LIST)
             .resultStyle("Ancestors([Gender].[F], 1)", ResultStyle.ITERABLE, ResultStyle.ITERABLE)

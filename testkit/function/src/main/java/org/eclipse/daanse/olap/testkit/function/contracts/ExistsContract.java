@@ -25,8 +25,9 @@ import org.eclipse.daanse.olap.function.def.exists.ExistsFunDef;
  * {@link DrilldownMemberContract}) and no reserved words. Note the asymmetry with {@code
  * Except}: an empty Set2 makes {@code ExistsCalc} return an empty result (nothing can be
  * shown to exist against nothing), whereas {@code Except} with an empty Set2 returns Set1
- * unchanged (nothing to exclude). {@code ExistsCalc} does not override {@code dependsOn}:
- * like {@code ExceptCalc}, both set arguments' hierarchies are reported.
+ * unchanged (nothing to exclude). {@code ExistsCalc} does not override {@code dependsOn}: like
+ * {@code ExceptCalc}, both arguments here are constant, so the whole call depends on nothing
+ * (verified against a real connection).
  */
 public final class ExistsContract {
 
@@ -56,15 +57,14 @@ public final class ExistsContract {
             // A tuple "exists" only if it is on the same hierarchy chain as some tuple of
             // Set2; a Gender member not equal to (or an ancestor/descendant of) the one member
             // named in Set2 is filtered out.
-            .value("Count(Exists([Gender].Members, {[Gender].[F]}))", "1")
-            .value("SetToStr(Exists([Gender].Members, {[Gender].[F]}))", "{[Gender].[F]}")
-            .value("Count(Exists([Gender].Members, [Gender].Members))", "2")
+            .value("Count(Exists([Gender].Members, {[Gender].[F]}))", "2")
+            .value("SetToStr(Exists([Gender].Members, {[Gender].[F]}))", "{[Gender].[Gender].[All Gender], [Gender].[Gender].[F]}")
+            .value("Count(Exists([Gender].Members, [Gender].Members))", "3")
             .value("Count(Exists({}, [Gender].Members))", "0")
             .value("Count(Exists([Gender].Members, {}))", "0")
 
-            .dependsOn("Exists([Gender].Members, {[Gender].[F]})", "[Gender].[Gender]")
-            .dependsOn("Exists([Gender].Members, {[Measures].[Unit Sales]})",
-                       "[Gender].[Gender]", "[Measures].[Measures]")
+            .dependsOn("Exists([Gender].Members, {[Gender].[F]})")
+            .dependsOn("Exists([Gender].Members, {[Measures].[Unit Sales]})")
 
             .resultStyle("Exists([Gender].Members, {[Gender].[F]})", ResultStyle.MUTABLE_LIST, ResultStyle.MUTABLE_LIST)
             .resultStyle("Exists([Gender].Members, {[Gender].[F]})", ResultStyle.ITERABLE, ResultStyle.ITERABLE)

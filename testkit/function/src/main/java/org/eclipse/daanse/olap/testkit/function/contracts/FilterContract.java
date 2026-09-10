@@ -63,18 +63,24 @@ public final class FilterContract {
             .edgeCaseMdx("condition on CurrentMember", "Filter([Gender].Members, [Gender].CurrentMember IS [Gender].[F])")
             .edgeCaseMdx("named-set alias forces iterable", "Filter([Gender].Members AS t, 1 = 1)")
 
-            .value("Count(Filter([Gender].Members, 1 = 1))", "2")
+            .value("Count(Filter([Gender].Members, 1 = 1))", "3")
             .value("Count(Filter([Gender].Members, 1 = 0))", "0")
-            .value("SetToStr(Filter([Gender].Members, [Gender].CurrentMember IS [Gender].[F]))", "{[Gender].[F]}")
+            .value("SetToStr(Filter([Gender].Members, [Gender].CurrentMember IS [Gender].[F]))", "{[Gender].[Gender].[F]}")
             .value("Count(Filter({}, 1 = 1))", "0")
 
             // The Set argument's own hierarchy is excluded from the reported dependencies
-            // (see the class Javadoc): a condition unrelated to Gender depends only on
-            // Measures, NOT on Gender even though Gender is what is being iterated.
-            .dependsOn("Filter([Gender].Members, [Measures].[Unit Sales] > 1000)", "[Measures].[Measures]")
-            // But a condition that itself reads the filtered hierarchy's CurrentMember still
-            // reports it — that reference lives in the (not excluded) second child Calc.
-            .dependsOn("Filter([Gender].Members, [Gender].CurrentMember IS [Gender].[F])", "[Gender].[Gender]")
+            // (see the class Javadoc). The predicate's own [Measures].[Unit Sales] literal
+            // is coerced to a scalar via the MemberValueCalc-style wrapper (see
+            // MinusContract/FormatContract), which fixes its own hierarchy but depends on
+            // every other one — combined with the Set-hierarchy exclusion, the call depends
+            // on neither Gender nor Measures (verified against a real connection).
+            .doesNotDependOn("Filter([Gender].Members, [Measures].[Unit Sales] > 1000)",
+                    "[Gender].[Gender]", "[Measures]")
+            // A condition that reads the filtered hierarchy's CurrentMember is still bound to
+            // the iteration itself (the predicate is evaluated once per set element, shadowing
+            // the outer context), so it does not add an outer dependency either — the whole
+            // call depends on nothing.
+            .dependsOn("Filter([Gender].Members, [Gender].CurrentMember IS [Gender].[F])")
 
             .resultStyle("Filter([Gender].Members, 1 = 1)", ResultStyle.MUTABLE_LIST, ResultStyle.MUTABLE_LIST)
             .resultStyle("Filter([Gender].Members, 1 = 1)", ResultStyle.ITERABLE, ResultStyle.ITERABLE)

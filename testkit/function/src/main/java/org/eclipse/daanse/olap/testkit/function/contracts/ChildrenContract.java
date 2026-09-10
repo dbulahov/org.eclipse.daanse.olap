@@ -55,10 +55,10 @@ public final class ChildrenContract {
             // [Gender] is a one-level hierarchy under an All member: a leaf has no children,
             // and the All member's children are exactly the two established Gender members.
             .value("Count([Gender].[F].Children)",           "0")
-            .value("SetToStr([Gender].[F].Parent.Children)", "{[Gender].[F], [Gender].[M]}")
+            .value("SetToStr([Gender].[F].Parent.Children)", "{[Gender].[Gender].[F], [Gender].[Gender].[M]}")
 
-            .dependsOn("[Gender].[F].Children", "[Gender].[Gender]")
-            .dependsOn("[Gender].[F].Parent.Children", "[Gender].[Gender]")
+            .dependsOn("[Gender].[F].Children")
+            .dependsOn("[Gender].[F].Parent.Children")
 
             // ChildrenCalc explicitly passes mutable = false to AbstractProfilingNestedTupleListCalc
             // ("The list is immutable, hence 'false' above" — its own comment), so it reports

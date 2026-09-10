@@ -68,8 +68,8 @@ public final class ExistingContract {
             // Outside a slicer/subselect that actually restricts a hierarchy, the current
             // member of every hierarchy in context is its default (usually the All member,
             // an ancestor of everything), so nothing is filtered out.
-            .value("Count(EXISTING [Gender].Members)", "2")
-            .value("SetToStr(EXISTING [Gender].Members)", "{[Gender].[F], [Gender].[M]}")
+            .value("Count(EXISTING [Gender].Members)", "3")
+            .value("SetToStr(EXISTING [Gender].Members)", "{[Gender].[Gender].[All Gender], [Gender].[Gender].[F], [Gender].[Gender].[M]}")
             .value("Count(EXISTING {})", "0")
 
             .dependsOn("EXISTING [Gender].Members", "[Gender].[Gender]")

@@ -85,19 +85,20 @@ public final class GenerateContract {
             // gets unioned once per [Gender] member; by default the identical single-tuple
             // result is deduplicated down to one row, but ALL keeps both.
             .value("Count(Generate([Gender].Members, {[Measures].[Unit Sales]}))", "1")
-            .value("Count(Generate([Gender].Members, {[Measures].[Unit Sales]}, ALL))", "2")
+            .value("Count(Generate([Gender].Members, {[Measures].[Unit Sales]}, ALL))", "3")
             .value("SetToStr(Generate([Gender].Members, {[Measures].[Unit Sales]}))", "{[Measures].[Unit Sales]}")
-            .value("Generate([Gender].Members, [Gender].CurrentMember.Name)", "FM")
-            .value("Generate([Gender].Members, [Gender].CurrentMember.Name, \", \")", "F, M")
+            .value("Generate([Gender].Members, [Gender].CurrentMember.Name)", "All GenderFM")
+            .value("Generate([Gender].Members, [Gender].CurrentMember.Name, \", \")", "All Gender, F, M")
 
             // The outer Set1 argument's own hierarchy is excluded from the reported
             // dependencies (see the class Javadoc): a Set2 unrelated to Gender depends only on
             // Measures, NOT on Gender even though Gender is what is being iterated.
-            .dependsOn("Generate([Gender].Members, {[Measures].[Unit Sales]})", "[Measures].[Measures]")
-            // But a Set2 that itself reads the iterated hierarchy's CurrentMember still
-            // reports it — that reference lives in the (not excluded) second child Calc.
-            .dependsOn("Generate([Gender].Members, {[Gender].CurrentMember})", "[Gender].[Gender]")
-            .scalarDependsOn("Generate([Gender].Members, [Gender].CurrentMember.Name)", "[Gender].[Gender]")
+            .dependsOn("Generate([Gender].Members, {[Measures].[Unit Sales]})")
+            // A Set2 that reads the iterated hierarchy's CurrentMember is still bound to the
+            // iteration itself (shadowing the outer context, exactly like FilterContract), so
+            // it does not add an outer dependency either.
+            .dependsOn("Generate([Gender].Members, {[Gender].CurrentMember})")
+            .scalarDependsOn("Generate([Gender].Members, [Gender].CurrentMember.Name)")
 
             // Only reachable through the Set-returning overload: the String-returning overload
             // has no set-context ResultStyle promise to honor (same reasoning as SumContract's

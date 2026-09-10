@@ -75,8 +75,8 @@ public final class LastSiblingContract {
             .value("([Gender].[F].Parent.LastSibling IS [Gender].[F].Parent)", "true")
             .value("([Gender].[F].Parent.Parent.LastSibling IS [Gender].[F].Parent.Parent)", "true")
 
-            .dependsOn("[Gender].[F].LastSibling", "[Gender].[Gender]")
-            .dependsOn("[Gender].[F].Parent.LastSibling", "[Gender].[Gender]")
+            .dependsOn("[Gender].[F].LastSibling")
+            .dependsOn("[Gender].[F].Parent.LastSibling")
 
             .waive(Promise.RESULT_SHAPE,
                     "returns a Member, not a set; the Set ResultStyle promise does not apply")

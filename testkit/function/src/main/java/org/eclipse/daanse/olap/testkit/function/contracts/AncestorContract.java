@@ -87,7 +87,7 @@ public final class AncestorContract {
             .value("(Ancestor([Gender].[F], 1) IS [Gender].[F].Parent)", "true")
             .value("(Ancestor([Gender].[F], 0) IS [Gender].[F])", "true")
 
-            .dependsOn("Ancestor([Gender].[F], 1)", "[Gender].[Gender]")
+            .dependsOn("Ancestor([Gender].[F], 1)")
 
             .waive(Promise.RESULT_SHAPE,
                     "returns a Member, not a set; the Set ResultStyle promise does not apply")

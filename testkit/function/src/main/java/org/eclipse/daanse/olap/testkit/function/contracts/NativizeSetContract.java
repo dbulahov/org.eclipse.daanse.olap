@@ -73,10 +73,10 @@ public final class NativizeSetContract {
             .edgeCaseMdx("member operand (lenient)", "NativizeSet([Gender].[F])")
             .edgeCaseMdx("crossjoined set",          "NativizeSet([Gender].Members * [Measures].[Unit Sales])")
 
-            .value("Count(NativizeSet([Gender].Members))", "2")
-            .value("SetToStr(NativizeSet({[Gender].[F]}))", "{[Gender].[F]}")
+            .value("Count(NativizeSet([Gender].Members))", "3")
+            .value("SetToStr(NativizeSet({[Gender].[F]}))", "{[Gender].[Gender].[F]}")
 
-            .dependsOn("NativizeSet([Gender].Members)", "[Gender].[Gender]")
+            .dependsOn("NativizeSet([Gender].Members)")
 
             .resultStyle("NativizeSet([Gender].Members)", ResultStyle.MUTABLE_LIST, ResultStyle.MUTABLE_LIST)
             .resultStyle("NativizeSet([Gender].Members)", ResultStyle.ITERABLE, ResultStyle.ITERABLE)

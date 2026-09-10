@@ -43,9 +43,21 @@ import org.eclipse.daanse.olap.testkit.function.contracts.FunctionContract.Promi
  * (Member)} value case below exercises exactly the call shape this bug broke.
  *
  * <p>{@code OpeningClosingPeriodFunDef.getResultType}/{@code compileCall} touch {@code
- * evaluator.getCube()}/{@code validator.getQuery().getCube()} for the 0- and 1-arg forms
- * (defaulting to the cube's Time hierarchy) — inert here since {@code CallAssert} only ever
- * calls {@code resolve()}, never {@code getResultType}, and this module never reaches Stage B.
+ * evaluator.getCube()}/{@code validator.getQuery().getCube()} for the 0-arg form and the
+ * {@code (Level)} 1-arg form (defaulting to the cube's Time hierarchy) — inert here for
+ * resolution (Stage A), but real once a connection reaches Stage B, exactly like the
+ * resolution-order bug above.
+ *
+ * <p>{@code compileCall} used to switch purely on {@code args.length}: <em>any</em> one-arg
+ * call — including the genuine {@code (Member)} overload the fix above routes correctly — was
+ * compiled as {@code (Level, implicit default-Time-member)}, discarding the actual Member
+ * argument and substituting an unrelated Time member instead. Fixed by checking {@code
+ * getFunctionMetaData().parameters()[0].dataType()} for the arity-1 case: since each one-arg
+ * overload is its own {@code OpeningClosingPeriodFunDef} instance with its own {@code
+ * FunctionMetaData}, this reliably tells {@code (Member)} apart from {@code (Level)} at
+ * compile time, independent of the resolver-ordering fix above. The 1-arg {@code (Member)}
+ * value cases below (verified against a real connection) exercise exactly the call shape this
+ * bug broke.
  */
 public final class ClosingPeriodContract {
 
@@ -75,19 +87,19 @@ public final class ClosingPeriodContract {
             .edgeCaseMdx("no arguments (implicit current Time member)", "ClosingPeriod()")
             .edgeCaseMdx("member only",         "ClosingPeriod([Gender].[F].Parent)")
             .edgeCaseMdx("member with no descendant (null result)", "ClosingPeriod([Gender].[F])")
-            .edgeCaseMdx("level and member",    "ClosingPeriod([Gender].[Gender], [Gender].[F].Parent)")
+            .edgeCaseMdx("level and member",    "ClosingPeriod([Gender].[F].Level, [Gender].[F].Parent)")
 
             // [Gender] is flat (hasAll=true, 2 levels: All and Gender). Children of the All
             // member are {F, M} in that order (HeadContract's established ordering), so the
             // *last* descendant at the Gender level is M — for both the explicit (Level,
             // Member) form and the 1-arg (Member) form (which derives "member's level + 1"
             // itself). The 1-arg case is exactly the shape the resolution-order bug above broke.
-            .value("(ClosingPeriod([Gender].[Gender], [Gender].[F].Parent) IS [Gender].[M])", "true")
+            .value("(ClosingPeriod([Gender].[F].Level, [Gender].[F].Parent) IS [Gender].[M])", "true")
             .value("(ClosingPeriod([Gender].[F].Parent) IS [Gender].[M])", "true")
             // F is already the deepest real level: there is no level below it to descend to.
             .value("(ClosingPeriod([Gender].[F]) IS [Gender].[F].Parent.Parent)", "true")
 
-            .dependsOn("ClosingPeriod([Gender].[Gender], [Gender].[F].Parent)", "[Gender].[Gender]")
+            .dependsOn("ClosingPeriod([Gender].[F].Level, [Gender].[F].Parent)")
 
             .waive(Promise.RESULT_SHAPE,
                     "returns a Member, not a set; the Set ResultStyle promise does not apply")

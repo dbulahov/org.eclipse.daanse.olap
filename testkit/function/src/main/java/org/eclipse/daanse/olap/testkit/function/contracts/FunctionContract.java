@@ -67,8 +67,12 @@ public record FunctionContract(
     public record EdgeCase(String label, List<DataType> argumentCategories, Optional<String> mdx) {
     }
 
-    /** An MDX expression and its expected formatted value — stage B. */
-    public record ValueCase(String mdx, String expectedFormattedValue) {
+    /**
+     * An MDX expression and its expected formatted value — stage B. {@code formatString},
+     * when present, is set as {@code FORMAT_STRING} on the probing calculated member — needed
+     * to see fractional digits, since the harness's default cell format has none.
+     */
+    public record ValueCase(String mdx, String expectedFormattedValue, Optional<String> formatString) {
     }
 
     /** An MDX expression and exactly the hierarchies it may depend on — stage B. */

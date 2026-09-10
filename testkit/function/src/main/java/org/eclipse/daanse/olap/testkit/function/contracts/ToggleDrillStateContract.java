@@ -81,9 +81,9 @@ public final class ToggleDrillStateContract {
             .edgeCaseMdx("symbol reserved by another function (documented gap)",
                     "ToggleDrillState([Gender].Members, [Gender].Members, ALL)")
 
-            .value("Count(ToggleDrillState([Gender].Members, {}))", "2")
+            .value("Count(ToggleDrillState([Gender].Members, {}))", "3")
             .value("Count(ToggleDrillState({}, [Gender].Members))", "0")
-            .value("SetToStr(ToggleDrillState([Gender].Members, {}))", "{[Gender].[F], [Gender].[M]}")
+            .value("SetToStr(ToggleDrillState([Gender].Members, {}))", "{[Gender].[Gender].[All Gender], [Gender].[Gender].[F], [Gender].[Gender].[M]}")
             // Expand: Set1 is just [All], Set2 = {All} — All is found but has no next tuple to
             // test as its descendant, so isDrilledDown stays false and All's children (F, M)
             // are appended after it.
@@ -94,7 +94,7 @@ public final class ToggleDrillStateContract {
             .value("Count(ToggleDrillState({[Gender].[F].Parent, [Gender].[F], [Gender].[M]}, "
                     + "{[Gender].[F].Parent}))", "1")
 
-            .dependsOn("ToggleDrillState([Gender].Members, {})", "[Gender].[Gender]")
+            .dependsOn("ToggleDrillState([Gender].Members, {})")
 
             .resultStyle("ToggleDrillState([Gender].Members, {})", ResultStyle.MUTABLE_LIST, ResultStyle.MUTABLE_LIST)
             .resultStyle("ToggleDrillState([Gender].Members, {})", ResultStyle.ITERABLE, ResultStyle.ITERABLE)

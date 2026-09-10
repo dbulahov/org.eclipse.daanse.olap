@@ -64,7 +64,7 @@ public final class HierarchizeContract {
             // visibly reorder [Gender].Members itself; pairing a member with its own Parent
             // shows the difference without needing to know the All member's schema-specific
             // name — the IIf compares names inside the MDX itself.
-            .value("Count(Hierarchize([Gender].Members))", "2")
+            .value("Count(Hierarchize([Gender].Members))", "3")
             .value("IIf(Hierarchize({[Gender].[F], [Gender].[F].Parent}, PRE).Item(0).Name = "
                    + "[Gender].[F].Parent.Name, \"YES\", \"NO\")", "YES")
             .value("IIf(Hierarchize({[Gender].[F], [Gender].[F].Parent}, POST).Item(0).Name = "
@@ -72,8 +72,8 @@ public final class HierarchizeContract {
             .value("IIf(Hierarchize({[Gender].[F], [Gender].[F].Parent}).Item(0).Name = "
                    + "[Gender].[F].Parent.Name, \"YES\", \"NO\")", "YES")   // default is PRE
 
-            .dependsOn("Hierarchize([Gender].Members)", "[Gender].[Gender]")
-            .dependsOn("Hierarchize([Gender].Members, POST)", "[Gender].[Gender]")
+            .dependsOn("Hierarchize([Gender].Members)")
+            .dependsOn("Hierarchize([Gender].Members, POST)")
 
             .resultStyle("Hierarchize([Gender].Members)", ResultStyle.MUTABLE_LIST, ResultStyle.MUTABLE_LIST)
             .resultStyle("Hierarchize([Gender].Members)", ResultStyle.ITERABLE, ResultStyle.ITERABLE)

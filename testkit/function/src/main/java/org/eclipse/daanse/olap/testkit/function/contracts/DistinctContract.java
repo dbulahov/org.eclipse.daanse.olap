@@ -51,10 +51,10 @@ public final class DistinctContract {
 
             .value("Count(Distinct({[Gender].[F], [Gender].[F], [Gender].[M]}))", "2")
             .value("SetToStr(Distinct({[Gender].[F], [Gender].[F], [Gender].[M]}))",
-                   "{[Gender].[F], [Gender].[M]}")
+                   "{[Gender].[Gender].[F], [Gender].[Gender].[M]}")
             .value("Count(Distinct({}))", "0")
 
-            .dependsOn("Distinct([Gender].Members)", "[Gender].[Gender]")
+            .dependsOn("Distinct([Gender].Members)")
 
             .resultStyle("Distinct([Gender].Members)", ResultStyle.MUTABLE_LIST, ResultStyle.MUTABLE_LIST)
             .resultStyle("Distinct([Gender].Members)", ResultStyle.ITERABLE, ResultStyle.ITERABLE)

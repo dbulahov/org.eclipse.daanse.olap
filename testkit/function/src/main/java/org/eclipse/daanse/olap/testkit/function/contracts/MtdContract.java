@@ -79,8 +79,8 @@ public final class MtdContract {
 
             .value("Count(Mtd([Time].[1997].[Q1].[2]))", "1")
 
-            .dependsOn("Mtd([Time].[1997].[Q1].[2])", "[Time].[Time]")
-            .dependsOn("Mtd()", "[Time].[Time]")
+            .dependsOn("Mtd([Time].[1997].[Q1].[2])")
+            .dependsOn("Mtd()", "[Time].[Time]", "[Time].[Weekly]")
 
             .resultStyle("Mtd([Time].[1997].[Q1].[2])", MUTABLE_LIST, MUTABLE_LIST)
             .resultStyle("Mtd([Time].[1997].[Q1].[2])", ITERABLE, ITERABLE)

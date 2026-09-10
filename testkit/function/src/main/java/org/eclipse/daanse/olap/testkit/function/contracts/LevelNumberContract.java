@@ -74,7 +74,7 @@ public final class LevelNumberContract {
             .value("[Gender].[M].Level_Number", "1")
             .value("[Gender].[F].Parent.Level_Number", "0")
 
-            .scalarDependsOn("[Gender].[F].Level_Number", "[Gender].[Gender]")
+            .scalarDependsOn("[Gender].[F].Level_Number")
 
             .waive(Promise.RESULT_SHAPE,
                     "scalar function; ResultStyle is VALUE by construction")

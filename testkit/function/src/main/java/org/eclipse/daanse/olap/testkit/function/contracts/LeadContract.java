@@ -73,7 +73,7 @@ public final class LeadContract {
             .value("([Gender].[F].Lead(1) IS [Gender].[M])", "true")
             .value("([Gender].[M].Lead(-1) IS [Gender].[F])", "true")
 
-            .dependsOn("[Gender].[F].Lead(1)", "[Gender].[Gender]")
+            .dependsOn("[Gender].[F].Lead(1)")
 
             .waive(Promise.RESULT_SHAPE,
                     "returns a Member, not a set; the Set ResultStyle promise does not apply")

@@ -91,13 +91,13 @@ public final class DrilldownLevelContract {
             // [Gender] has one real level beneath (All); its members are leaves, so drilling
             // down without a Level argument (which searches the deepest depth already present)
             // finds no children to add and returns the set unchanged.
-            .value("Count(DrilldownLevel([Gender].Members))", "2")
-            .value("SetToStr(DrilldownLevel([Gender].Members))", "{[Gender].[F], [Gender].[M]}")
+            .value("Count(DrilldownLevel([Gender].Members))", "3")
+            .value("SetToStr(DrilldownLevel([Gender].Members))", "{[Gender].[Gender].[All Gender], [Gender].[Gender].[F], [Gender].[Gender].[M]}")
             .value("Count(DrilldownLevel({}))", "0")
-            .value("Count(DrilldownLevel([Gender].Members, , NULL))", "2")
+            .value("Count(DrilldownLevel([Gender].Members, , NULL))", "3")
 
-            .dependsOn("DrilldownLevel([Gender].Members)", "[Gender].[Gender]")
-            .dependsOn("DrilldownLevel([Gender].Members, [Gender].[F].Level)", "[Gender].[Gender]")
+            .dependsOn("DrilldownLevel([Gender].Members)")
+            .dependsOn("DrilldownLevel([Gender].Members, [Gender].[F].Level)")
 
             .resultStyle("DrilldownLevel([Gender].Members)", ResultStyle.MUTABLE_LIST, ResultStyle.MUTABLE_LIST)
             .resultStyle("DrilldownLevel([Gender].Members)", ResultStyle.ITERABLE, ResultStyle.ITERABLE)

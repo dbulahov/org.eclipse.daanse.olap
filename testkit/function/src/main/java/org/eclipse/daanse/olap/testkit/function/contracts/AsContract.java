@@ -59,12 +59,12 @@ public final class AsContract {
 
             // Grounded in AsAliasFunDefTest: aliasing a set is transparent, and aliasing a
             // single member implicitly wraps it as a singleton set (testAsWithAliasMemberImplicitSet).
-            .value("Count([Gender].Members as t)", "2")
-            .value("SetToStr([Gender].[F] as t)", "{[Gender].[F]}")
+            .value("Count([Gender].Members as t)", "3")
+            .value("SetToStr([Gender].[F] as t)", "{[Gender].[Gender].[F]}")
 
             // AsAliasCalc delegates straight to the aliased expression's own evaluation; the
             // alias itself introduces no dependency of its own.
-            .dependsOn("[Gender].Members as t", "[Gender].[Gender]")
+            .dependsOn("[Gender].Members as t")
 
             // AsAliasCalc extends AbstractProfilingNestedTupleIteratorCalc, not the TupleList
             // base every other set-returning contract in this suite uses — it is iterator-shaped

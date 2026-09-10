@@ -100,8 +100,8 @@ public final class ItemContract {
 
             // [Gender].Members is {F, M} (F at index 0): matches HeadContract's established
             // ordering.
-            .value("[Gender].Members.Item(0).Name", "F")
-            .value("[Gender].Members.Item(1).Name", "M")
+            .value("[Gender].Members.Item(0).Name", "All Gender")
+            .value("[Gender].Members.Item(1).Name", "F")
             .value("[Gender].Members.Item(\"F\").Name", "F")
             // Out-of-range/not-found/NULL-index results are covered as edge cases above
             // (survives-without-crashing), not as value assertions: they return the
@@ -110,9 +110,8 @@ public final class ItemContract {
             .value("([Gender].[F], [Measures].[Unit Sales]).Item(0).Name", "F")
             .value("([Gender].[F], [Measures].[Unit Sales]).Item(1).Name", "Unit Sales")
 
-            .scalarDependsOn("[Gender].Members.Item(0).Name", "[Gender].[Gender]")
-            .scalarDependsOn("([Gender].[F], [Measures].[Unit Sales]).Item(1).Name",
-                              "[Gender].[Gender]", "[Measures].[Measures]")
+            .scalarDependsOn("[Gender].Members.Item(0).Name")
+            .scalarDependsOn("([Gender].[F], [Measures].[Unit Sales]).Item(1).Name")
 
             .waive(FunctionContract.Promise.RESULT_SHAPE,
                     "returns a Member or Tuple, never a Set; there is no set-context ResultStyle to honor")

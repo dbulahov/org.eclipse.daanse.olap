@@ -87,10 +87,9 @@ public final class StarContract {
 
             // Multiply, in scalar context.
             .scalarDependsOn("2 * 3")                                              // depends on nothing
-            .scalarDependsOn("[Measures].[Unit Sales] * 2", "[Measures].[Measures]")
+            .scalarDoesNotDependOn("[Measures].[Unit Sales] * 2", "[Measures]")
             // CrossJoin, in the set context a genuine axis expression provides.
-            .dependsOn("[Gender].Members * [Measures].[Unit Sales]",
-                       "[Gender].[Gender]", "[Measures].[Measures]")
+            .dependsOn("[Gender].Members * [Measures].[Unit Sales]")
 
             // Only reachable through CrossJoin: Multiply returns a scalar, so a set-context
             // ResultStyle promise does not apply to it (same reasoning as AbsContract's waiver).

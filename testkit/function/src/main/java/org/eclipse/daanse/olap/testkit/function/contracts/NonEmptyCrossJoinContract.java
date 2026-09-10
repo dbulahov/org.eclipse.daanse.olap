@@ -59,11 +59,11 @@ public final class NonEmptyCrossJoinContract {
             .edgeCaseMdx("both sets empty",     "NonEmptyCrossJoin({}, {})")
             .edgeCaseMdx("member operand",      "NonEmptyCrossJoin([Gender].[F], {[Measures].[Unit Sales]})")
 
-            .value("Count(NonEmptyCrossJoin([Gender].Members, {[Measures].[Unit Sales]}))", "2")
+            .value("Count(NonEmptyCrossJoin([Gender].Members, {[Measures].[Unit Sales]}))", "3")
             .value("Count(NonEmptyCrossJoin({}, [Gender].Members))", "0")
 
-            .dependsOn("NonEmptyCrossJoin([Gender].Members, {[Measures].[Unit Sales]})",
-                       "[Gender].[Gender]", "[Measures].[Measures]")
+            .doesNotDependOn("NonEmptyCrossJoin([Gender].Members, {[Measures].[Unit Sales]})",
+                       "[Gender].[Gender]", "[Measures]")
 
             .resultStyle("NonEmptyCrossJoin([Gender].Members, {[Measures].[Unit Sales]})",
                          ResultStyle.MUTABLE_LIST, ResultStyle.MUTABLE_LIST)

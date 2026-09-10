@@ -70,11 +70,11 @@ public final class TopSumContract {
             .value("Count(TopSum([Gender].Members, -10, [Measures].[Unit Sales]))",  "0")
             .value("Count(TopSum([Gender].Members, NULL, [Measures].[Unit Sales]))", "0")
             .value("Count(TopSum({}, 50, [Measures].[Unit Sales]))",                 "0")
-            .value("Count(TopSum([Gender].Members, 1000000, [Measures].[Unit Sales]))", "2")
+            .value("Count(TopSum([Gender].Members, 1000000, [Measures].[Unit Sales]))", "3")
 
-            .dependsOn("TopSum([Gender].Members, 50, [Measures].[Unit Sales])",
-                       "[Gender].[Gender]", "[Measures].[Measures]")
-            .dependsOn("TopSum([Gender].Members, 50, 1)", "[Gender].[Gender]")
+            .doesNotDependOn("TopSum([Gender].Members, 50, [Measures].[Unit Sales])",
+                       "[Gender].[Gender]", "[Measures]")
+            .dependsOn("TopSum([Gender].Members, 50, 1)")
 
             .resultStyle("TopSum([Gender].Members, 50, [Measures].[Unit Sales])",
                          ResultStyle.MUTABLE_LIST, ResultStyle.MUTABLE_LIST)

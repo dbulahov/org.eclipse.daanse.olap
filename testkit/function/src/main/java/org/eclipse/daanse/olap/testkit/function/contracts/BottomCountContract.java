@@ -62,15 +62,15 @@ public final class BottomCountContract {
             // Without an order expression, BottomCount keeps the set's natural order and takes
             // the tail — the mirror image of Head/Tail, whose order is already pinned down by
             // HeadContract.
-            .value("SetToStr(BottomCount([Gender].Members, 1))", "{[Gender].[M]}")
+            .value("SetToStr(BottomCount([Gender].Members, 1))", "{[Gender].[Gender].[M]}")
             .value("Count(BottomCount([Gender].Members, 0))",    "0")
             .value("Count(BottomCount({}, 5))",                  "0")
-            .value("Count(BottomCount([Gender].Members, 1000))", "2")
+            .value("Count(BottomCount([Gender].Members, 1000))", "3")
             .value("Count(BottomCount([Gender].Members, 1, [Measures].[Unit Sales]))", "1")
 
-            .dependsOn("BottomCount([Gender].Members, 2)", "[Gender].[Gender]")
-            .dependsOn("BottomCount([Gender].Members, 1, [Measures].[Unit Sales])",
-                       "[Gender].[Gender]", "[Measures].[Measures]")
+            .dependsOn("BottomCount([Gender].Members, 2)")
+            .doesNotDependOn("BottomCount([Gender].Members, 1, [Measures].[Unit Sales])",
+                       "[Gender].[Gender]", "[Measures]")
 
             .resultStyle("BottomCount([Gender].Members, 2)", ResultStyle.MUTABLE_LIST, ResultStyle.MUTABLE_LIST)
             .resultStyle("BottomCount([Gender].Members, 2)", ResultStyle.ITERABLE, ResultStyle.ITERABLE)

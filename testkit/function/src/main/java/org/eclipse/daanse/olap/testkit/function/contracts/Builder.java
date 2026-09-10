@@ -120,7 +120,17 @@ public final class Builder {
     // ---- promise 5 ---------------------------------------------------------
 
     public Builder value(String mdx, String expectedFormattedValue) {
-        values.add(new ValueCase(mdx, expectedFormattedValue));
+        values.add(new ValueCase(mdx, expectedFormattedValue, Optional.empty()));
+        return this;
+    }
+
+    /**
+     * Like {@link #value(String, String)}, but probes with an explicit {@code FORMAT_STRING}
+     * — needed whenever the expected value has decimal places, since the harness's default
+     * cell format has none and would otherwise round the result away.
+     */
+    public Builder value(String mdx, String formatString, String expectedFormattedValue) {
+        values.add(new ValueCase(mdx, expectedFormattedValue, Optional.of(formatString)));
         return this;
     }
 
@@ -142,6 +152,19 @@ public final class Builder {
     /** The interesting direction for context-setting functions. */
     public Builder scalarDoesNotDependOn(String mdx, String... hierarchyUniqueNames) {
         dependencies.add(new DependencyCase(mdx, true, List.of(), List.of(hierarchyUniqueNames)));
+        return this;
+    }
+
+    /**
+     * Set-expression counterpart of {@link #scalarDoesNotDependOn}: asserts that the compiled
+     * set does not depend on the given hierarchies, without pinning down the full dependency
+     * set the way {@link #dependsOn} does. Needed whenever a Set-returning call embeds a
+     * literal-member argument that gets coerced to a scalar (the {@code MemberValueCalc}-style
+     * wrapper fixes its own hierarchy but depends on every other one) — pinning the full
+     * hierarchy list would make the assertion brittle against unrelated schema changes.
+     */
+    public Builder doesNotDependOn(String mdx, String... hierarchyUniqueNames) {
+        dependencies.add(new DependencyCase(mdx, false, List.of(), List.of(hierarchyUniqueNames)));
         return this;
     }
 

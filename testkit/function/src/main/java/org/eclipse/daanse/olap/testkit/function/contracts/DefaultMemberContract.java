@@ -78,8 +78,8 @@ public final class DefaultMemberContract {
             // via [Gender].[F].Parent.
             .value("([Gender].DefaultMember IS [Gender].[F].Parent)", "true")
 
-            .dependsOn("[Gender].DefaultMember", "[Gender].[Gender]")
-            .dependsOn("[Gender].[F].Level.DefaultMember", "[Gender].[Gender]")
+            .dependsOn("[Gender].DefaultMember")
+            .dependsOn("[Gender].[F].Level.DefaultMember")
 
             .waive(Promise.RESULT_SHAPE,
                     "returns a Member, not a set; the Set ResultStyle promise does not apply")
