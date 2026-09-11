@@ -153,8 +153,8 @@ public final class ExecutionContext {
      * Creates a root execution context with the specified timeout and metadata.
      *
      * @param timeout  the timeout duration; EMPTY means unlimited
-     *                 (executeDuration <= 0 maps to empty and must never
-     *                 become a default budget)
+     *                 ({@code executeDuration <= 0} maps to empty and must
+     *                 never become a default budget)
      * @param metadata the metadata for the root context
      * @return a new root ExecutionContext
      */

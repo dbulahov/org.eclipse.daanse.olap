@@ -18,10 +18,9 @@ package org.eclipse.daanse.olap.api.execution;
  *
  * <p>
  * This exception is thrown by {@link ExecutionContext#checkCancelOrTimeout()}
- * when the execution has exceeded its configured timeout duration.
+ * when the execution has passed its deadline.
  * </p>
  *
- * @see ExecutionContext#timeout()
  * @see ExecutionContext#checkCancelOrTimeout()
  */
 @SuppressWarnings("serial")

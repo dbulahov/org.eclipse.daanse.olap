@@ -40,7 +40,6 @@ import java.util.Objects;
  * in-flight cancel round-trip (bounded by the driver's cancel timeout);
  * the cancel side never waits for the closer, so there is no cycle.</li>
  * </ul>
- * </p>
  */
 public final class GuardedStatement {
 
