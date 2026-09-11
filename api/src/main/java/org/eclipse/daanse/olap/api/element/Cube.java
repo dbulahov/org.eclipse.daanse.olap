@@ -70,13 +70,6 @@ public interface Cube extends OlapElement, MetaElement {
     Hierarchy lookupHierarchy(NameSegment s, boolean unique);
 
     /**
-     * Returns Member[]. It builds Member[] by analyzing cellset, which gets created
-     * by running mdx sQuery. query has to be in the format of something like "[with
-     * calculated members] select *members* on columns from this".
-     */
-    Member[] getMembersForQuery(String query, List<Member> calcMembers);
-
-    /**
      * Returns a CatalogReader for which this cube is the context for lookup up
      * members. If role is null, the returned schema reader also obeys the
      * access-control profile of role.
