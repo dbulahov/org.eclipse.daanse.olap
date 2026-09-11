@@ -17,7 +17,9 @@ import java.util.List;
 import java.util.Optional;
 
 import org.eclipse.daanse.olap.api.Context;
+import org.eclipse.daanse.olap.api.connection.Connection;
 import org.eclipse.daanse.olap.api.element.Catalog;
+import org.eclipse.daanse.olap.api.element.db.DatabaseSchema;
 import org.eclipse.daanse.olap.xmla.connector.ContextListSupplyer;
 import org.eclipse.daanse.xmla.api.XmlaRequest;
 
@@ -82,5 +84,22 @@ public final class DiscoverScope {
             return dimensionName + "." + hierarchyName;
         }
         return hierarchyName;
+    }
+    
+    /**
+     * The database schemas this caller may see in that catalog: the connection's
+     * reader answers, the same list the SQL guard is built over, so a table a client
+     * is shown is a table it can query. The element's list would show everyone
+     * everything.
+     * <p>
+     * Session-cached or freshly opened, the connection is the one
+     * {@link ContextListSupplyer#getConnection} hands out; the catalog reached this
+     * caller through the same call, so the name resolves.
+     */
+    public static List<? extends DatabaseSchema> databaseSchemas(ContextListSupplyer contexts, Catalog catalog,
+            XmlaRequest caller) {
+        Connection connection = contexts.getConnection(caller, catalog.getName());
+        List<? extends DatabaseSchema> schemas = connection.getCatalogReader().getDatabaseSchemas();
+        return schemas == null ? List.of() : schemas;
     }
 }

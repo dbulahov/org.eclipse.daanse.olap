@@ -405,7 +405,7 @@ public class OtherDiscover {
             return List.of();
         }
 
-        CatalogReader reader = catalog.getCatalogReaderWithDefaultRole();
+        CatalogReader reader = contexts.getConnection(caller, catalog.getName()).getCatalogReader();
         LocalePolicy localePolicy = new LocalePolicy.ServerDefault(java.util.Locale.getDefault());
         CsdlRequest csdlRequest = new CsdlRequest(version, perspectiveName, localePolicy);
         DiscoverCsdlMetadataRow row = SERVER.createDiscoverCsdlMetadataRow();

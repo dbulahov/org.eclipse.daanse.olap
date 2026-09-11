@@ -15,30 +15,38 @@ package org.eclipse.daanse.olap.xmla.connector.embedded;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.math.BigInteger;
+import java.security.Principal;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import org.eclipse.daanse.olap.api.Context;
+import org.eclipse.daanse.olap.api.catalog.CatalogReader;
+import org.eclipse.daanse.olap.api.connection.Connection;
 import org.eclipse.daanse.olap.api.element.Catalog;
 import org.eclipse.daanse.olap.api.element.Cube;
 import org.eclipse.daanse.olap.api.element.Dimension;
 import org.eclipse.daanse.olap.api.element.Hierarchy;
 import org.eclipse.daanse.olap.api.element.Level;
 import org.eclipse.daanse.olap.api.element.Member;
+import org.eclipse.daanse.olap.api.element.db.DatabaseColumn;
+import org.eclipse.daanse.olap.api.element.db.DatabaseTable;
 import org.eclipse.daanse.olap.xmla.connector.ContextListSupplyer;
 import org.eclipse.daanse.xmla.api.RowsetProvider;
 import org.eclipse.daanse.xmla.api.RowsetScope;
+import org.eclipse.daanse.xmla.api.XmlaRequest;
 import org.eclipse.daanse.xmla.model.rowset.relational.DbschemaCatalogsRow;
 import org.eclipse.daanse.xmla.model.rowset.relational.DbschemaColumnsRow;
 import org.eclipse.daanse.xmla.model.rowset.relational.DbschemaProviderTypesRow;
 import org.eclipse.daanse.xmla.model.rowset.relational.DbschemaSchemataRow;
 import org.eclipse.daanse.xmla.model.rowset.relational.DbschemaTablesInfoRow;
 import org.eclipse.daanse.xmla.model.rowset.relational.DbschemaTablesRow;
-import org.eclipse.daanse.xmla.api.XmlaRequest;
 import org.eclipse.emf.ecore.EObject;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -87,6 +95,17 @@ class DbSchemaDiscoverTest {
     @Mock
     private ContextListSupplyer contexts;
 
+    @Mock
+    private Connection connection;
+    @Mock
+    private CatalogReader reader;
+    @Mock
+    private DatabaseTable factTable;
+    @Mock
+    private DatabaseTable secretTable;
+    @Mock
+    private DatabaseColumn keyColumn;
+    
     private final XmlaRequest anonymous = XmlaRequest.anonymous();
 
     @BeforeEach
@@ -104,6 +123,40 @@ class DbSchemaDiscoverTest {
                 RowsetScope.of(Requests.discover(requestType, restrictions), anonymous, contexts, Providers.served()));
     }
 
+    /** A caller who holds roles, the way CatalogScopeTest builds one. */
+    private static XmlaRequest named(String user, Set<String> roles) {
+        Principal principal = () -> user;
+        return new XmlaRequest(principal, roles, Map.of(), "http://localhost/xmla", "127.0.0.1");
+    }
+
+    /** The element knows two tables in schema main; the caller's reader admits one. */
+    private void aCatalogWhoseReaderHidesTheSecretTable() {
+        when(contexts.tryGetFirstByName(any(), any())).thenReturn(Optional.of(catalog));
+        when(contexts.get(any())).thenAnswer(i -> List.of(catalog));
+        when(catalog.getName()).thenReturn("FoodMart");
+        when(dbSchema1.getName()).thenReturn("main");
+        when(factTable.getName()).thenReturn("Fact");
+        when(secretTable.getName()).thenReturn("Salary");
+        when(keyColumn.getName()).thenReturn("KEY");
+        when(factTable.getDbColumns()).thenAnswer(i -> List.of(keyColumn));
+        when(secretTable.getDbColumns()).thenAnswer(i -> List.of(keyColumn));
+        when(dbSchema1.getDbTables()).thenAnswer(i -> List.of(factTable, secretTable));
+        when(catalog.getDatabaseSchemas()).thenAnswer(i -> List.of(dbSchema1));
+
+        // what the role sees: the same schema, one table
+        when(dbSchema2.getName()).thenReturn("main");
+        when(dbSchema2.getDbTables()).thenAnswer(i -> List.of(factTable));
+        when(reader.getDatabaseSchemas()).thenAnswer(i -> List.of(dbSchema2));
+        when(connection.getCatalogReader()).thenReturn(reader);
+        when(contexts.getConnection(any(), eq("FoodMart"))).thenReturn(connection);
+    }
+
+    private List<EObject> discover(String requestType, Map<String, String> restrictions, XmlaRequest caller) {
+        RowsetProvider<ContextListSupplyer> provider = Providers.of(requestType);
+        return provider.rows(
+                RowsetScope.of(Requests.discover(requestType, restrictions), caller, contexts, Providers.served()));
+    }
+    
     @Test
     void dbSchemaCatalogs() {
         when(contexts.getContexts()).thenAnswer(invocation -> List.of(context));
@@ -158,6 +211,9 @@ class DbSchemaDiscoverTest {
         when(cube1.getMeasures()).thenAnswer(invocation -> List.of(measure));
         when(cube2.getMeasures()).thenAnswer(invocation -> List.of(measure));
         when(catalog.getCubes()).thenAnswer(invocation -> List.of(cube1, cube2));
+        when(contexts.getConnection(any(), any())).thenReturn(connection);
+        when(connection.getCatalogReader()).thenReturn(reader);
+        when(reader.getDatabaseSchemas()).thenAnswer(invocation -> List.of(dbSchema1));
 
         List<EObject> rows = discover("DBSCHEMA_COLUMNS", Map.of("TABLE_CATALOG", "foo"));
         assertThat(rows).hasSize(10);
@@ -204,6 +260,9 @@ class DbSchemaDiscoverTest {
         when(dbSchema1.getName()).thenReturn("dbSchema1Name");
         when(dbSchema2.getName()).thenReturn("dbSchema2Name");
         when(catalog.getDatabaseSchemas()).thenAnswer(invocation -> List.of(dbSchema1, dbSchema2));
+        when(contexts.getConnection(any(), any())).thenReturn(connection);
+        when(connection.getCatalogReader()).thenReturn(reader);
+        when(reader.getDatabaseSchemas()).thenAnswer(invocation -> List.of(dbSchema1, dbSchema2));
 
         List<EObject> rows = discover("DBSCHEMA_SCHEMATA", Map.of("CATALOG_NAME", "foo"));
         assertThat(rows).hasSize(2);
@@ -230,6 +289,9 @@ class DbSchemaDiscoverTest {
         when(cube1.getDimensions()).thenAnswer(invocation -> List.of(dimension1, dimension2));
         when(cube2.getName()).thenReturn("cube2Name");
         when(cube2.getDimensions()).thenAnswer(invocation -> List.of(dimension1, dimension2));
+        when(contexts.getConnection(any(), any())).thenReturn(connection);
+        when(connection.getCatalogReader()).thenReturn(reader);
+        when(reader.getDatabaseSchemas()).thenAnswer(invocation -> List.of(dbSchema1, dbSchema2));
 
         List<EObject> rows = discover("DBSCHEMA_TABLES", Map.of("TABLE_CATALOG", "foo"));
         // Two cubes, each one TABLE row plus two level rows per dimension (hierarchy2
@@ -288,6 +350,9 @@ class DbSchemaDiscoverTest {
     @Test
     void cubeRowsCarryTheirOlapType() {
         oneCubeOneLevel();
+        when(contexts.getConnection(any(), any())).thenReturn(connection);
+        when(connection.getCatalogReader()).thenReturn(reader);
+        when(reader.getDatabaseSchemas()).thenAnswer(invocation -> List.of(dbSchema1, dbSchema2));
 
         List<EObject> rows = discover("DBSCHEMA_TABLES", Map.of("TABLE_CATALOG", "cat"));
 
@@ -310,6 +375,9 @@ class DbSchemaDiscoverTest {
     @Test
     void theNameRestrictionIsHonoured() {
         oneCubeOneLevel();
+        when(contexts.getConnection(any(), any())).thenReturn(connection);
+        when(connection.getCatalogReader()).thenReturn(reader);
+        when(reader.getDatabaseSchemas()).thenAnswer(invocation -> List.of(dbSchema1, dbSchema2));
 
         assertThat(discover("DBSCHEMA_TABLES", Map.of("TABLE_CATALOG", "cat", "TABLE_NAME", "cube1Name"))).hasSize(1);
         assertThat(discover("DBSCHEMA_TABLES", Map.of("TABLE_CATALOG", "cat", "TABLE_NAME", "nothing"))).isEmpty();
@@ -330,7 +398,9 @@ class DbSchemaDiscoverTest {
         when(catalog.getName()).thenReturn("cat");
         when(catalog.getCubes()).thenAnswer(invocation -> List.of());
         when(catalog.getDatabaseSchemas()).thenAnswer(invocation -> List.of(dbSchema1));
-
+        when(contexts.getConnection(any(), any())).thenReturn(connection);
+        when(connection.getCatalogReader()).thenReturn(reader);
+        when(reader.getDatabaseSchemas()).thenAnswer(invocation -> List.of(dbSchema1));
         List<EObject> rows = discover("DBSCHEMA_TABLES", Map.of("TABLE_CATALOG", "cat"));
 
         assertThat(rows).hasSize(1);
@@ -342,5 +412,63 @@ class DbSchemaDiscoverTest {
         assertThat(row.getTableType()).isEqualTo("TABLE");
         // The absence is the signal: this row is a table, not a cube object.
         assertThat(row.getTableOlapType()).isNull();
+    }
+    
+    
+    @Test
+    void dbSchemaTablesListsOnlyWhatTheCallersReaderAdmits() {
+        aCatalogWhoseReaderHidesTheSecretTable();
+        XmlaRequest caller = named("tester", Set.of("roleCustom"));
+
+        List<EObject> rows = discover("DBSCHEMA_TABLES", Map.of("TABLE_CATALOG", "FoodMart"), caller);
+
+        assertThat(rows).extracting(row -> ((DbschemaTablesRow) row).getTableName()).containsExactly("Fact");
+        verify(contexts).getConnection(caller, "FoodMart");
+    }
+
+    @Test
+    void dbSchemaColumnsListsOnlyTheColumnsOfAdmittedTables() {
+        aCatalogWhoseReaderHidesTheSecretTable();
+
+        List<EObject> rows = discover("DBSCHEMA_COLUMNS", Map.of("TABLE_CATALOG", "FoodMart"),
+                named("tester", Set.of("roleCustom")));
+
+        assertThat(rows).extracting(row -> ((DbschemaColumnsRow) row).getTableName()).containsOnly("Fact");
+    }
+
+    @Test
+    void dbSchemaSchemataAnswersFromTheReaderToo() {
+        aCatalogWhoseReaderHidesTheSecretTable();
+        when(reader.getDatabaseSchemas()).thenAnswer(i -> List.of()); // the role sees no schema at all
+
+        List<EObject> rows = discover("DBSCHEMA_SCHEMATA", Map.of("CATALOG_NAME", "FoodMart"),
+                named("tester", Set.of("roleNone")));
+
+        assertThat(rows).extracting(row -> ((DbschemaSchemataRow) row).getSchemaName()).doesNotContain("main");
+    }
+/*
+    @Test
+    void dbSchemaPrimaryKeysSkipsTablesTheCallerMayNotSee() {
+        aCatalogWhoseReaderHidesTheSecretTable();
+        org.eclipse.daanse.olap.api.element.db.DatabaseKey key = mock(org.eclipse.daanse.olap.api.element.db.DatabaseKey.class);
+        when(key.getName()).thenReturn("PK_Salary");
+        when(key.getColumns()).thenAnswer(i -> List.of(keyColumn));
+        when(secretTable.getPrimaryKey()).thenReturn(Optional.of(key));
+        when(factTable.getPrimaryKey()).thenReturn(Optional.empty());
+
+        List<EObject> rows = discover("DBSCHEMA_PRIMARY_KEYS", Map.of("TABLE_CATALOG", "FoodMart"),
+                named("tester", Set.of("roleCustom")));
+
+        assertThat(rows).isEmpty();
+    }
+*/
+    @Test
+    void theElementStillAnswersEverythingWhenTheReaderIsUnfiltered() {
+        aCatalogWhoseReaderHidesTheSecretTable();
+        when(reader.getDatabaseSchemas()).thenAnswer(i -> List.of(dbSchema1)); // an ALL role: the element's own list
+
+        List<EObject> rows = discover("DBSCHEMA_TABLES", Map.of("TABLE_CATALOG", "FoodMart"), anonymous);
+
+        assertThat(rows).extracting(row -> ((DbschemaTablesRow) row).getTableName()).containsExactly("Fact", "Salary");
     }
 }

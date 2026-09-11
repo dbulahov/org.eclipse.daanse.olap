@@ -103,7 +103,8 @@ public class DbSchemaDiscover {
             // have nothing to do with any cube: inside, they were repeated once per cube
             // and a catalog holding tables but no cube produced none at all.
             if (olapType.isEmpty() || SCHEMA.equals(olapType.get())) {
-                schemaColumns(catalog, tableName, columnName, result);
+                List<? extends DatabaseSchema> schemas = DiscoverScope.databaseSchemas(contexts, catalog, caller);
+                schemaColumns(catalog.getName(), schemas, tableName, columnName, result);
             }
         }
         return result;
@@ -158,12 +159,8 @@ public class DbSchemaDiscover {
         }
     }
 
-    private static void schemaColumns(Catalog catalog, Optional<String> tableName, Optional<String> columnName,
-            List<EObject> result) {
-        List<? extends DatabaseSchema> schemas = catalog.getDatabaseSchemas();
-        if (schemas == null) {
-            return;
-        }
+    private static void schemaColumns(String catalogName, List<? extends DatabaseSchema> schemas,
+            Optional<String> tableName, Optional<String> columnName, List<EObject> result) {
         int ordinal = 1;
         for (DatabaseSchema schema : schemas) {
             if (schema.getDbTables() == null) {
@@ -181,7 +178,7 @@ public class DbSchemaDiscover {
                         continue;
                     }
                     DbschemaColumnsRow row = FACTORY.createDbschemaColumnsRow();
-                    row.setTableCatalog(catalog.getName());
+                    row.setTableCatalog(catalogName);
                     row.setTableSchema(schema.getName());
                     row.setTableName(table.getName());
                     row.setColumnName(column.getName());
@@ -328,7 +325,7 @@ public class DbSchemaDiscover {
 
         List<EObject> result = new ArrayList<>();
         for (Catalog catalog : DiscoverScope.catalogs(contexts, catalogName, caller)) {
-            List<? extends DatabaseSchema> schemas = catalog.getDatabaseSchemas();
+        	List<? extends DatabaseSchema> schemas = DiscoverScope.databaseSchemas(contexts, catalog, caller);
             if (schemas == null) {
                 continue;
             }
@@ -383,7 +380,8 @@ public class DbSchemaDiscover {
             // Outside the cube loop: a catalog's own tables do not belong to any cube, and
             // a catalog with no cube at all still has them.
             if (isTableType(tableType, TABLE) && olapType.isEmpty()) {
-                databaseTables(catalog, tableSchema, tableName, result);
+                List<? extends DatabaseSchema> schemas = DiscoverScope.databaseSchemas(contexts, catalog, caller);
+                databaseTables(catalog.getName(), schemas, tableSchema, tableName, result);
             }
         }
         return result;
@@ -432,12 +430,8 @@ public class DbSchemaDiscover {
      * {@code TABLE_OLAP_TYPE} is left unset, and that absence is the only thing
      * telling a client these rows are tables rather than cube objects.
      */
-    private static void databaseTables(Catalog catalog, Optional<String> schemaWanted, Optional<String> nameWanted,
+    private static void databaseTables(String catalogName, List<? extends DatabaseSchema> schemas, Optional<String> schemaWanted, Optional<String> nameWanted,
             List<EObject> result) {
-        List<? extends DatabaseSchema> schemas = catalog.getDatabaseSchemas();
-        if (schemas == null) {
-            return;
-        }
         for (DatabaseSchema schema : schemas) {
             List<? extends DatabaseTable> tables = schema.getDbTables();
             if (tables == null || !matches(schemaWanted, schema.getName())) {
@@ -445,7 +439,7 @@ public class DbSchemaDiscover {
             }
             for (DatabaseTable table : tables) {
                 if (matches(nameWanted, table.getName())) {
-                    result.add(tableRow(catalog.getName(), schema.getName(), table.getName(), TABLE, null,
+                    result.add(tableRow(catalogName, schema.getName(), table.getName(), TABLE, null,
                             table.getDescription()));
                 }
             }

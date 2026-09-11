@@ -16,21 +16,30 @@ package org.eclipse.daanse.olap.xmla.connector.embedded;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.security.Principal;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import org.eclipse.daanse.olap.api.Context;
+import org.eclipse.daanse.olap.api.catalog.CatalogReader;
+import org.eclipse.daanse.olap.api.connection.Connection;
+import org.eclipse.daanse.olap.api.element.Catalog;
+import org.eclipse.daanse.olap.api.element.Cube;
 import org.eclipse.daanse.olap.xmla.connector.ContextListSupplyer;
 import org.eclipse.daanse.xmla.api.RowsetProvider;
 import org.eclipse.daanse.xmla.api.RowsetScope;
+import org.eclipse.daanse.xmla.api.XmlaRequest;
 import org.eclipse.daanse.xmla.model.rowset.core.DiscoverDatasourcesRow;
 import org.eclipse.daanse.xmla.model.rowset.core.DiscoverKeywordsRow;
 import org.eclipse.daanse.xmla.model.rowset.core.DiscoverLiteralsRow;
 import org.eclipse.daanse.xmla.model.rowset.core.DiscoverPropertiesRow;
-import org.eclipse.daanse.xmla.api.XmlaRequest;
 import org.eclipse.emf.ecore.EObject;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -54,6 +63,18 @@ class OtherDiscoverTest {
     private Context<?> context2;
     @Mock
     private ContextListSupplyer contexts;
+
+    @Mock
+    private Catalog catalog;   // the existing test mocks context1, context2 and contexts only
+
+    @Mock
+    private Connection connection;
+
+    @Mock
+    private CatalogReader callerReader;
+
+    @Mock
+    private Cube cube;
 
     private final XmlaRequest anonymous = XmlaRequest.anonymous();
 
@@ -79,6 +100,19 @@ class OtherDiscoverTest {
                 Providers.served()));
     }
 
+    /** A caller who holds roles, the way CatalogScopeTest builds one. */
+    private static XmlaRequest named(String user, Set<String> roles) {
+        Principal principal = () -> user;
+        return new XmlaRequest(principal, roles, Map.of(), "http://localhost/xmla", "127.0.0.1");
+    }
+
+    private List<EObject> discover(String requestType, Map<String, String> restrictions, XmlaRequest caller) {
+        RowsetProvider<ContextListSupplyer> provider = Providers.of(requestType);
+        return provider.rows(
+                RowsetScope.of(Requests.discover(requestType, restrictions), caller, contexts, Providers.served()));
+    }
+
+    
     @Test
     void dataSources() {
         when(contexts.getContexts()).thenReturn(List.of(context1, context2));
@@ -322,5 +356,25 @@ class OtherDiscoverTest {
         assertThat(rows).hasSize(1);
         String description = (String) rows.get(0).eGet(rows.get(0).eClass().getEStructuralFeature("description"));
         assertThat(description).contains("OLE DB").contains("Appendix B");
+    }
+
+    @Test
+    void csdlMetadataIsEmittedThroughTheCallersReader() {
+        when(contexts.tryGetFirstByName(eq("FoodMart"), any())).thenReturn(Optional.of(catalog));
+        when(catalog.getName()).thenReturn("FoodMart");
+        when(contexts.getConnection(any(), eq("FoodMart"))).thenReturn(connection);
+        when(connection.getCatalogReader()).thenReturn(callerReader);
+        when(callerReader.getCatalog()).thenReturn(catalog);
+        when(cube.getName()).thenReturn("Sales");
+        when(callerReader.getCubes()).thenReturn(List.of(cube));
+        when(callerReader.getCubeDimensions(cube)).thenAnswer(i -> List.of()); // no dimensions to walk
+
+        XmlaRequest caller = named("tester", Set.of("roleNone"));
+        List<EObject> rows = discover("DISCOVER_CSDL_METADATA",
+                Map.of("CATALOG_NAME", "FoodMart", "PERSPECTIVE_NAME", "Sales"), caller);
+
+        assertThat(rows).hasSize(1);
+        verify(contexts).getConnection(caller, "FoodMart");
+        verify(catalog, never()).getCatalogReaderWithDefaultRole();
     }
 }
