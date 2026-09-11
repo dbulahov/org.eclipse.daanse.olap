@@ -24,8 +24,11 @@
 
 package org.eclipse.daanse.olap.connection;
 
+import java.sql.SQLException;
 import java.util.List;
 import java.util.Optional;
+
+import javax.sql.DataSource;
 
 import org.eclipse.daanse.mdx.model.api.MdxStatement;
 import org.eclipse.daanse.mdx.parser.api.MdxParser;
@@ -68,6 +71,8 @@ public abstract class ConnectionBase implements Connection {
     ExpressionProvider expressionProvider = new ExpressionProviderImpl();
 
     private Optional<SqlGuard> oSqlGuard = Optional.empty();
+
+	private String currentSchemaName;
 
     protected ConnectionBase() {
 //        getContext().getSqlGuardFactory();
@@ -149,9 +154,12 @@ public abstract class ConnectionBase implements Connection {
             return parseAsMdxAfterAll(statement, queryToParse, funTable, strictValidation, null);
         }
         List<DatabaseSchema> ds = (List<DatabaseSchema>) this.getCatalogReader().getDatabaseSchemas();
-        org.eclipse.daanse.sql.guard.api.elements.DatabaseCatalog dc = new DatabaseCatalogImpl("", ds);
+        String catalogName = getCatalog().getName();
+        String schemaName = currentSchemaName(ds);
+        org.eclipse.daanse.sql.guard.api.elements.DatabaseCatalog dc = new DatabaseCatalogImpl(catalogName, ds);
         //TODO need resolve function list from other place
-        SqlGuard guard = oSqlGuardFactory.get().create("", "", dc, List.of("sum", "avg", "min", "max", "count", "concat"), this.getContext().getDialect());
+        SqlGuard guard = oSqlGuardFactory.get().create(catalogName, schemaName, dc,
+                List.of("sum", "avg", "min", "max", "count", "concat"), this.getContext().getDialect());
         // TODO add white list functions
         try {
             String sanetizedSql = guard.guard(queryToParse);
@@ -163,7 +171,33 @@ public abstract class ConnectionBase implements Connection {
         }
     }
 
-    private QueryComponent parseAsMdxAfterAll(
+    /**
+     * The schema an unqualified table name means: the one the database connection is in
+     * ({@code main} on DuckDB, {@code public} on PostgreSQL), the same source RolapCatalog
+     * uses to name an unnamed mapping schema. When the driver does not say and the
+     * catalog has exactly one schema, that one; otherwise the empty string, which resolves
+     * nothing and lets the guard report the name as unknown.
+     */
+    private String currentSchemaName(List<DatabaseSchema> schemas) {
+        if (currentSchemaName == null) {
+            String fromDriver = null;
+            DataSource dataSource = getContext().getDataSource();
+            if (dataSource != null) {
+                try (java.sql.Connection connection = dataSource.getConnection()) {
+                    fromDriver = connection.getSchema();
+                } catch (SQLException e) {
+                    getLogger().debug("default schema of catalog {} not readable", getCatalog().getName(), e);
+                }
+            }
+            if (fromDriver == null || fromDriver.isBlank()) {
+                fromDriver = schemas.size() == 1 && schemas.get(0).getName() != null ? schemas.get(0).getName() : "";
+            }
+            currentSchemaName = fromDriver;
+        }
+        return currentSchemaName;
+    }
+    
+	private QueryComponent parseAsMdxAfterAll(
         Statement statement,
         String queryToParse,
         FunctionService funTable,
