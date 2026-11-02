@@ -234,7 +234,15 @@ public final class HierarchyEmitter {
             org.eclipse.daanse.xmla.model.csdl.v2.bi.TPropertyRef pref = bi.createTPropertyRef();
             pref.setName(p.getName()); 
             levelProp.getBiProperty().getRelatedTo().getPropertyRef().add(pref);
-            
+
+            // The values of a member property are those of its members: a client groups
+            // them by the level as well (e.g. the education of each customer).
+            TPropertyRefs groupBy = bi.createTPropertyRefs();
+            org.eclipse.daanse.xmla.model.csdl.v2.bi.TPropertyRef levelRef = bi.createTPropertyRef();
+            levelRef.setName(levelProp.getName());
+            groupBy.getPropertyRef().add(levelRef);
+            biProp.setGroupBy(groupBy);
+
             //biProp.setHidden(true);
             biProp.setReferenceName(level.getUniqueName().replaceAll("\\[", "").replaceAll("\\]", "") + "." + property.getName());
             biProp.setDefaultAggregateFunction(TDefaultAggregateFunction.NONE);
